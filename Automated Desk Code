@@ -42,7 +42,11 @@ def passPreset(qos, preset):
     #keep the position of the desk if no preset button is triggered
     client.publish("desk/cmd/preset", "The position is to remain the same", qos)
 
-
+def passDefinedLocation(x, y, z, qos):
+  #this function passes a location where the x, y, and z coordinates are known
+  client.publish("desk/cmd/defLoc", x, qos)
+  client.publish("desk/cmd/defLoc", y, qos)
+  client.publish("desk/cmd/defLoc", z, qos)
 
 
 def main():
