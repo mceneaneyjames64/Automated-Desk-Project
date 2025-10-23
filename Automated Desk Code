@@ -3,7 +3,7 @@
 import paho.mqtt.client as mqtt
 
 #function to pass message with preset data
-def passPreset(topic, qos, preset):
+def passPreset(qos, preset):
 
   if (preset == 1):
     #placeholder values used for positions as of right now
@@ -12,9 +12,9 @@ def passPreset(topic, qos, preset):
     preset1z = 0
 
     #publish the x, y, and z coordinates needed for the preset position
-    client.publish(topic, preset1x, qos)
-    client.publish(topic, preset1y, qos)
-    client.publish(topic, preset1z, qos)
+    client.publish("desk/cmd/preset", preset1x, qos)
+    client.publish("desk/cmd/preset", preset1y, qos)
+    client.publish("desk/cmd/preset", preset1z, qos)
 
   elif(preset == 2)
     #placeholder values used for positions as of right now
@@ -23,9 +23,9 @@ def passPreset(topic, qos, preset):
     preset2z = 5
 
     #publish the x, y, and z coordinates needed for the preset position
-    client.publish(topic, preset2x, qos)
-    client.publish(topic, preset2y, qos)
-    client.publish(topic, preset2z, qos)
+    client.publish("desk/cmd/preset", preset2x, qos)
+    client.publish("desk/cmd/preset", preset2y, qos)
+    client.publish("desk/cmd/preset", preset2z, qos)
 
   elif(preset == 3)
     #placeholder values used for positions as of right now
@@ -34,13 +34,13 @@ def passPreset(topic, qos, preset):
     preset3z = 5
 
     #publish the x, y, and z coordinates needed for the preset position
-    client.publish(topic, preset3x, qos)
-    client.publish(topic, preset3y, qos)
-    client.publish(topic, preset3z, qos)
+    client.publish("desk/cmd/preset", preset3x, qos)
+    client.publish("desk/cmd/preset", preset3y, qos)
+    client.publish("desk/cmd/preset", preset3z, qos)
 
   else
     #keep the position of the desk if no preset button is triggered
-    client.publish(topic, "The position is to remain the same", qos)
+    client.publish("desk/cmd/preset", "The position is to remain the same", qos)
 
 
 
