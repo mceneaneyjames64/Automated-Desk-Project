@@ -52,6 +52,11 @@ def passDefinedLocation(x, y, z, qos):
 def main():
   #main portion of the file
 
+  # initalize mqtt client
+  client = mqtt.Client(
+  protocol = mqtt.MQTTv5
+  )
+
   try:
     #start the infinite loop
     client.loop_start()
