@@ -1,1 +1,66 @@
 #This file is intended for the Python code
+
+import paho.mqtt.client as mqtt
+
+#function to pass message with preset data
+def passPreset(topic, qos, preset):
+
+  if (preset == 1):
+    #placeholder values used for positions as of right now
+    preset1x = 0
+    preset1y = 0
+    preset1z = 0
+
+    #publish the x, y, and z coordinates needed for the preset position
+    client.publish(topic, preset1x, qos)
+    client.publish(topic, preset1y, qos)
+    client.publish(topic, preset1z, qos)
+
+  elif(preset == 2)
+    #placeholder values used for positions as of right now
+    preset2x = 3
+    preset2y = 4
+    preset2z = 5
+
+    #publish the x, y, and z coordinates needed for the preset position
+    client.publish(topic, preset2x, qos)
+    client.publish(topic, preset2y, qos)
+    client.publish(topic, preset2z, qos)
+
+  elif(preset == 3)
+    #placeholder values used for positions as of right now
+    preset3x = 3
+    preset3y = 4
+    preset3z = 5
+
+    #publish the x, y, and z coordinates needed for the preset position
+    client.publish(topic, preset3x, qos)
+    client.publish(topic, preset3y, qos)
+    client.publish(topic, preset3z, qos)
+
+  else
+    #keep the position of the desk if no preset button is triggered
+    client.publish(topic, "The position is to remain the same", qos)
+
+
+
+
+def main():
+  #main portion of the file
+
+  try:
+    #start the infinite loop
+    client.loop_start()
+
+    while True:
+      #pass is when no value here, functions should be called in this part
+      pass
+
+  finally:
+    #end the infinite loop and disconnect from the pi
+    client.loop_stop()
+    client.disconnect()
+
+  #end the file with call to main
+if__name__ == '__main__':
+  main()
