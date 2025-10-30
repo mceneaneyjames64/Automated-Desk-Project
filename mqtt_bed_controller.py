@@ -152,11 +152,11 @@ async def vibrate_feet():
 ################################################################################
 
 # MQTT broker settings.
-MQTT_BROKER = "192.168.1.131" # Broker IP
+MQTT_BROKER = "192.168.1.138" # Broker IP
 MQTT_PORT = 1883
 MQTT_TOPIC = "home/bed/command"
-MQTT_USERNAME = "" #Broker username
-MQTT_PASSWORD = "" #Broker password
+MQTT_USERNAME = "mqtttest" #Broker username
+MQTT_PASSWORD = "VMIececapstone" #Broker password
 
 # One-shot command mapping.
 ONE_SHOT_COMMANDS = {
