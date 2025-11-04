@@ -1,5 +1,9 @@
 #!/home/jd/Dev/BedControl/.venv/bin/python
 
+#############################################################################
+#       Home Assistant to Laptop via MQTT, Laptop to Bed via Bluetooth
+#############################################################################
+
 import asyncio
 from bleak import BleakClient
 from aiomqtt import Client, MqttError
@@ -8,11 +12,13 @@ from aiomqtt import Client, MqttError
 #                           CONFIGURATION & BLE SETUP
 ################################################################################
 
-BED_ADDRESS = "D0:87:18:BA:53:BC"
+#Address and how to write to bed
+BED_ADDRESS = "D0:87:18:BA:53:BC" #bluetooth address
 WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"
 NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"
 
 # Command constants for the bed.
+#protocol for talking to bed, when code received, bed knows to move
 CMD_HEAD_UP = 0x10
 CMD_HEAD_DOWN = 0x20
 CMD_BACK_TILT_UP = 0x1
@@ -28,6 +34,8 @@ CMD_FLAT = 0x08000000
 ################################################################################
 #                           BLE UTILITY FUNCTIONS
 ################################################################################
+
+#Bluetooth info
 
 def calc_checksum(packet: bytearray) -> int:
     total = sum(packet[:-1])
@@ -50,6 +58,7 @@ def build_bed_command(key: int) -> bytes:
 ################################################################################
 
 class BedController:
+    #addresses
     def __init__(self, address: str, write_char_uuid: str):
         self.address = address
         self.write_char_uuid = write_char_uuid
@@ -57,6 +66,7 @@ class BedController:
         self.lock = asyncio.Lock()
 
     async def connect(self):
+        #connect to bluetooth with address supplied
         if not self.client.is_connected:
             try:
                 await self.client.connect()
@@ -65,12 +75,15 @@ class BedController:
                 print("BLE connection error:", e)
 
     async def ensure_connected(self):
+        #ensure that the bluetooth is running
+        #returns conenction or runs through again depending on outcome
         if not self.client.is_connected:
             print("BLE not connected, attempting reconnect...")
             await self.connect()
         return self.client.is_connected
 
     async def write_command(self, command_key: int):
+        #writes to bed, publishes messages on error
         if await self.ensure_connected():
             cmd = build_bed_command(command_key)
             async with self.lock:
@@ -84,9 +97,11 @@ class BedController:
             print("Could not connect to BLE device.")
 
     async def one_off_command(self, command_key: int):
+        #equivalent to a preset command
         await self.write_command(command_key)
 
     async def continuous_command(self, command_key: int):
+        #up/down button on remote function
         try:
             while True:
                 await self.write_command(command_key)
@@ -101,6 +116,7 @@ bed_controller = BedController(BED_ADDRESS, WRITE_CHAR_UUID)
 ################################################################################
 #                           MOVEMENT FUNCTIONS
 ################################################################################
+#uses bed commands to specify to move to a set position, change from one off to stop being preset
 
 # One-shot (tap) functions.
 async def head_up():
@@ -150,6 +166,9 @@ async def vibrate_feet():
 ################################################################################
 #                   MQTT INTEGRATION & CONTINUOUS TASKS
 ################################################################################
+#gets all the MQTT info, broker and port specified in home assistant
+#topic specified in home assistant 
+#one shot and continuous commands are mapping of commands received from MQTT
 
 # MQTT broker settings.
 MQTT_BROKER = "192.168.1.138" # Broker IP
@@ -185,12 +204,14 @@ CONTINUOUS_COMMANDS = {
 
 # Dictionary to track active continuous tasks.
 # For each command (e.g. "head_up"), we store a dict with keys: 'task' and 'last_update'
+#Makes list of commands received to keep track of continuous commands
 continuous_tasks = {}
 
 # Timeout: if no repeated message arrives within this many seconds, cancel the continuous command.
 CONTINUOUS_TIMEOUT = 0.3
 
 async def mqtt_command_handler():
+    #subscribe and decode messages from MQTT
     async with Client(MQTT_BROKER, port=MQTT_PORT, username=MQTT_USERNAME, password=MQTT_PASSWORD) as client:
         await client.subscribe(MQTT_TOPIC)
         print(f"Subscribed to MQTT topic: {MQTT_TOPIC}")
@@ -219,6 +240,7 @@ async def mqtt_command_handler():
                 print(f"Unknown command received: {payload}")
 
 async def continuous_task_monitor():
+    #monitors list and runs command list
     while True:
         now = asyncio.get_event_loop().time()
         to_cancel = []
@@ -236,6 +258,8 @@ async def continuous_task_monitor():
         await asyncio.sleep(0.1)
 
 async def ble_connection_monitor():
+    #tracks if bed is still connected and calls to main every once in a while to check
+    #will try to reconnect if connection interupted
     while True:
         if not bed_controller.client.is_connected:
             print("BLE disconnected, attempting reconnect...")
@@ -247,6 +271,8 @@ async def ble_connection_monitor():
 ################################################################################
 
 async def main():
+    #calls all the functions to run, will not call any functions until the bed has connected
+    #monitors the task after creation
     await bed_controller.connect()
     mqtt_task = asyncio.create_task(mqtt_command_handler())
     monitor_task = asyncio.create_task(ble_connection_monitor())
