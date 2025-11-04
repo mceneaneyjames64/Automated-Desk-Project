@@ -1,5 +1,10 @@
 #This file is intended for the Python code
 
+#Three movement functions controlled by actuators:
+#Desk up and down
+#monitor angle up and monitor angle down
+#raise and lower monitor
+
 import paho.mqtt.client as mqtt
 
 #function to pass message with preset data
