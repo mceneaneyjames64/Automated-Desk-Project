@@ -9,6 +9,8 @@ import asyncio
 from bleak import BleakClient
 from aiomqtt import Client, MqttError
 
+DESK_ADDRESS = #FIXME: BLUETOOTH ADDRESS FOR THE RECIEVEING END WHEN FOUND (i.e. Pi/MCU/Ergoquest)
+
 #function to pass message with preset data
 def passPreset(qos, preset):
 
