@@ -9,8 +9,8 @@ from aiomqtt import Client, MqttError
 ################################################################################
 
 BED_ADDRESS = "B8:27:EB:CD:57:6C"                            #test raspberry pi address
-WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"
-NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"
+WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"     #need to find pi equivalent
+NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"    #need to find pi equivalent
 
 # Command constants for the bed.
 CMD_monitor_up = 0x1
