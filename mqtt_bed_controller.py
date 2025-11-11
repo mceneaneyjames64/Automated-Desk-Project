@@ -172,6 +172,8 @@ ONE_SHOT_COMMANDS = {
     "set_preset_one": set_preset_one,
     "set_preset_two": set_preset_two,
     "set_preset_three": set_preset_three,
+    "calibrate": calibrate,
+    "emergency_stop": emergency_stop,
 }
 
 # Mapping for continuous (hold) commands.
