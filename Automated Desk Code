@@ -104,5 +104,135 @@ desk_controller = DeskController(DESK_ADDRESS, WRITE_CHAR_UUID)
 #                          MOVEMENT FUNCTIONS
 ####################################################################################
 
+# One-shot (tap) functions.
+async def keyboard_up():
+    print("One-shot: Keyboard Up")
+    await bed_controller.one_off_command(CMD_KEYBOARD_UP)
 
+async def keyboard_down():
+    print("One-shot: Keyboard Down")
+    await bed_controller.one_off_command(CMD_KEYBOARD_DOWN)
+
+async def monitor_tilt_up():
+    print("One-shot: Monitor Tilt Up")
+    await bed_controller.one_off_command(CMD_ROTATE_MONITOR_UP)
+
+async def monitor_tilt_down():
+    print("One-shot: Monitor Tilt Down")
+    await bed_controller.one_off_command(CMD_ROTATE_MONITOR_DOWN)
+
+async def raise_monitor_up():
+    print("One-shot: Raise Monitor Up")
+    await bed_controller.one_off_command(CMD_RAISE_MONITOR)
+
+async def lower_monitor_down():
+    print("One-shot: Lower Monitor Down")
+    await bed_controller.one_off_command(CMD_LOWER_MONITOR)
+
+################################################################################
+#                   MQTT INTEGRATION & CONTINUOUS TASKS
+################################################################################
+
+# MQTT broker settings.
+MQTT_BROKER = "" # FIXME: ADD Broker IP
+MQTT_PORT = 1883 #FIXME: CHANGE MQTT PORT
+MQTT_TOPIC = "home/desk/command"
+MQTT_USERNAME = "" #Broker username
+MQTT_PASSWORD = "" #Broker password
+
+# One-shot command mapping.
+ONE_SHOT_COMMANDS = {
+    "keyboard_up": keyboard_up,
+    "keyboard_down": keyboard_down,
+    "monitor_tilt_up": monitor_tilt_up,
+    "monitor_tilt_down": monitor_tilt_down,
+    "raise_monitor_up": raise_monitor_up,
+    "lower_monitor_down": lower_monitor_down,
+}
+
+# Mapping for continuous (hold) commands.
+CONTINUOUS_COMMANDS = {
+    "keyboard_up": CMD_KEYBOARD_UP,
+    "keyboard_down": CMD_KEYBOARD_DOWN,
+    "monitor_tilt_up": CMD_ROTATE_MONITOR_UP,
+    "monitor_tilt_down": CMD_ROTATE_MONITOR_DOWN,
+    "raise_monitor_up": CMD_RAISE_MONITOR,
+    "lower_monitor_down": CMD_LOWER_MONITOR,
+}
+
+# Dictionary to track active continuous tasks.
+# For each command (e.g. "keyboard_up"), we store a dict with keys: 'task' and 'last_update'
+continuous_tasks = {}
+
+# Timeout: if no repeated message arrives within this many seconds, cancel the continuous command.
+CONTINUOUS_TIMEOUT = 0.3
+
+#Handle continuous commands and one-shot commands
+async def mqtt_command_handler():
+    async with Client(MQTT_BROKER, port=MQTT_PORT, username=MQTT_USERNAME, password=MQTT_PASSWORD) as client:
+        await client.subscribe(MQTT_TOPIC)
+        print(f"Subscribed to MQTT topic: {MQTT_TOPIC}")
+        async for message in client.messages:
+            payload = message.payload.decode().strip()
+            print(f"Received MQTT message: {payload}")
+
+            if payload.startswith("start_"):
+                cmd = payload[6:]  # e.g. "keyboard_up"
+                if cmd in CONTINUOUS_COMMANDS:
+                    now = asyncio.get_event_loop().time()
+                    if cmd in continuous_tasks:
+                        # Update the last update time.
+                        continuous_tasks[cmd]['last_update'] = now
+                    else:
+                        # Start a new continuous task.
+                        task = asyncio.create_task(desk_controller.continuous_command(CONTINUOUS_COMMANDS[cmd]))
+                        continuous_tasks[cmd] = {'task': task, 'last_update': now}
+                        print(f"Started continuous command: {cmd}")
+                else:
+                    print(f"Unknown continuous command: {cmd}")
+
+            elif payload in ONE_SHOT_COMMANDS:
+                asyncio.create_task(ONE_SHOT_COMMANDS[payload]())
+            else:
+                print(f"Unknown command received: {payload}")
+
+#monitor continuous commands and tell them when to stop
+async def continuous_task_monitor():
+    while True:
+        now = asyncio.get_event_loop().time()
+        to_cancel = []
+        for cmd, info in continuous_tasks.items():
+            if now - info['last_update'] > CONTINUOUS_TIMEOUT:
+                to_cancel.append(cmd)
+        for cmd in to_cancel:
+            task = continuous_tasks[cmd]['task']
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                print(f"Stopped continuous command: {cmd}")
+            continuous_tasks.pop(cmd, None)
+        await asyncio.sleep(0.1)
+
+#monitor bluetooth connection to make sure everythign works
+async def ble_connection_monitor():
+    while True:
+        if not desk_controller.client.is_connected:
+            print("BLE disconnected, attempting reconnect...")
+            await desk_controller.connect()
+        await asyncio.sleep(5)
+
+################################################################################
+#                           MAIN ENTRY POINT
+################################################################################
+
+async def main():
+    await desk_controller.connect()
+    mqtt_task = asyncio.create_task(mqtt_command_handler())
+    monitor_task = asyncio.create_task(ble_connection_monitor())
+    continuous_monitor_task = asyncio.create_task(continuous_task_monitor())
+    await asyncio.gather(mqtt_task, monitor_task, continuous_monitor_task)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
