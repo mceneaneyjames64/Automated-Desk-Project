@@ -4,10 +4,10 @@ import asyncio
 from bleak import BleakClient
 from aiomqtt import Client, MqttError
 
-#FIX ME: ADD BLUETOOTH ADDRESS AND FIX UUIDs FOR WRITING AND NITIFYING IF NEEDED
-DESK_ADDRESS = "" 
-WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"
-NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"
+#FIXME: ADD BLUETOOTH ADDRESS AND FIX UUIDs FOR WRITING AND NITIFYING IF NEEDED
+DESK_ADDRESS = ""                                                                                     #FIXME: ADD BLUETOOTH ADDRESS
+WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"                                              #FIXME: CHANGE UUID IF NEEDED
+NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"                                             #FIXME: CHANGE UUID IF NEEDED
 
 # Command constants for the desk.
 #protocol for talking to desk, when code received, desk knows to move
@@ -134,11 +134,11 @@ async def lower_monitor_down():
 ################################################################################
 
 # MQTT broker settings.
-MQTT_BROKER = "" # FIXME: ADD Broker IP
-MQTT_PORT = 1883 #FIXME: CHANGE MQTT PORT
+MQTT_BROKER = ""                                                                 #FIXME: ADD Broker IP
+MQTT_PORT = 1883                                                                 #FIXME: CHANGE MQTT PORT
 MQTT_TOPIC = "home/desk/command"
-MQTT_USERNAME = "" #Broker username
-MQTT_PASSWORD = "" #Broker password
+MQTT_USERNAME = "" #Broker username    INTENTIONALLY BLANK
+MQTT_PASSWORD = "" #Broker password    INTENTIONALLY BLANK
 
 # One-shot command mapping.
 ONE_SHOT_COMMANDS = {
