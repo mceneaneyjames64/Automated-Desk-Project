@@ -1,0 +1,275 @@
+#!/home/jd/Dev/BedControl/.venv/bin/python
+
+import asyncio
+from bleak import BleakClient
+from aiomqtt import Client, MqttError
+
+################################################################################
+#                           CONFIGURATION & BLE SETUP
+################################################################################
+
+BED_ADDRESS = "B8:27:EB:CD:57:6C"
+WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"
+NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"
+
+# Command constants for the bed.
+CMD_monitor_up = 0x1
+CMD_monitor_down = 0x2
+CMD_keyboard_up = 0x3
+CMD_keyboard_down = 0x4
+CMD_monitor_tilt_up = 0x4
+CMD_monitor_tilt_down = 0x6
+CMD_preset_one = 0x7
+CMD_preset_two = 0x8
+CMD_preset_three = 0x9
+CMD_set_preset_one = 0x10
+CMD_set_preset_two = 0x11
+CMD_set_preset_three = 0x12
+CMD_calibrate = 0x13
+CMD_emergency_stop =0x14
+
+################################################################################
+#                           BLE UTILITY FUNCTIONS
+################################################################################
+
+def calc_checksum(packet: bytearray) -> int:
+    total = sum(packet[:-1])
+    return (~total) & 0xFF
+
+def build_bed_command(key: int) -> bytes:
+    pkt = bytearray(8)
+    pkt[0] = 0xE5
+    pkt[1] = 0xFE
+    pkt[2] = 0x16
+    pkt[3] = (key >> 0) & 0xFF
+    pkt[4] = (key >> 8) & 0xFF
+    pkt[5] = (key >> 16) & 0xFF
+    pkt[6] = (key >> 24) & 0xFF
+    pkt[7] = calc_checksum(pkt)
+    return bytes(pkt)
+
+################################################################################
+#                           BED CONTROLLER CLASS
+################################################################################
+
+class BedController:
+    def __init__(self, address: str, write_char_uuid: str):
+        self.address = address
+        self.write_char_uuid = write_char_uuid
+        self.client = BleakClient(address)
+        self.lock = asyncio.Lock()
+
+    async def connect(self):
+        if not self.client.is_connected:
+            try:
+                await self.client.connect()
+                print("BLE connected")
+            except Exception as e:
+                print("BLE connection error:", e)
+
+    async def ensure_connected(self):
+        if not self.client.is_connected:
+            print("BLE not connected, attempting reconnect...")
+            await self.connect()
+        return self.client.is_connected
+
+    async def write_command(self, command_key: int):
+        if await self.ensure_connected():
+            cmd = build_bed_command(command_key)
+            async with self.lock:
+                try:
+                    await self.client.write_gatt_char(self.write_char_uuid, cmd)
+                except Exception as e:
+                    print("Error writing command:", e)
+                    await self.client.disconnect()
+                    await self.connect()
+        else:
+            print("Could not connect to BLE device.")
+
+    async def one_off_command(self, command_key: int):
+        await self.write_command(command_key)
+
+    async def continuous_command(self, command_key: int):
+        try:
+            while True:
+                await self.write_command(command_key)
+                await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            print(f"Continuous command {command_key} cancelled.")
+            # Clean exit on cancellation.
+
+# Global controller instance.
+bed_controller = BedController(BED_ADDRESS, WRITE_CHAR_UUID)
+
+################################################################################
+#                           MOVEMENT FUNCTIONS
+################################################################################
+
+# One-shot (tap) functions.
+async def monitor_up():
+    print("One-shot: Monitor Up")
+    await bed_controller.one_off_command(CMD_monitor_up)
+
+async def monitor_down():
+    print("One-shot: Monitor Down")
+    await bed_controller.one_off_command(CMD_monitor_down)
+
+async def keyboard_up():
+    print("One-shot: Keyboard Up")
+    await bed_controller.one_off_command(CMD_keyboard_up)
+
+async def keyboard_down():
+    print("One-shot: Keyboard Down")
+    await bed_controller.one_off_command(CMD_keyboard_down)
+
+async def monitor_tilt_up():
+    print("One-shot: Monitor Tilt Up")
+    await bed_controller.one_off_command(CMD_monitor_tilt_up)
+
+async def monitor_tilt_down():
+    print("One-shot: Monitor Tilt Down")
+    await bed_controller.one_off_command(CMD_monitor_tilt_down)
+
+async def preset_one():
+    print("Preset One...")
+    await bed_controller.one_off_command(CMD_preset_one)
+
+async def preset_two():
+    print("Preset Two...")
+    await bed_controller.one_off_command(CMD_preset_two)
+
+async def preset_three():
+    print("Preset Three...")
+    await bed_controller.one_off_command(CMD_preset_three)
+
+async def set_preset_one():
+    print("Set Preset One...")
+    await bed_controller.one_off_command(CMD_set_preset_one)
+
+async def set_preset_two():
+    print("Set Preset Two...")
+    await bed_controller.one_off_command(CMD_set_preset_two)
+
+async def set_preset_three():
+    print("Set Preset Three...")
+    await bed_controller.one_off_command(CMD_set_preset_three)
+
+async def calibrate():
+    print("Calibrate...")
+    await bed_controller.one_off_command(CMD_calibrate)
+
+async def emergency_stop():
+    print("Emergency Stop...")
+    await bed_controller.one_off_command(CMD_emergency_stop)
+
+################################################################################
+#                   MQTT INTEGRATION & CONTINUOUS TASKS
+################################################################################
+
+# MQTT broker settings.
+MQTT_BROKER = "192.168.1.138" # Broker IP
+MQTT_PORT = 1883
+MQTT_TOPIC = "home/desk/command"
+MQTT_USERNAME = "mqtttest" #Broker username
+MQTT_PASSWORD = "VMIececapstone" #Broker password
+
+# One-shot command mapping.
+ONE_SHOT_COMMANDS = {
+    "monitor_up": monitor_up,
+    "monitor_down": monitor_down,
+    "keyboard_up": keyboard_up,
+    "keyboard_down": keyboard_down,
+    "monitor_tilt_up": monitor_tilt_up,
+    "monitor_tilt_down": monitor_tilt_down,
+    "preset_one": preset_one,
+    "preset_two": preset_two,
+    "preset_three": preset_three,
+    "set_preset_one": set_preset_one,
+    "set_preset_two": set_preset_two,
+    "set_preset_three": set_preset_three,
+    "calibrate": calibrate,
+    "emergency_stop": emergency_stop,
+}
+
+# Mapping for continuous (hold) commands.
+CONTINUOUS_COMMANDS = {
+    "monitor_up": CMD_monitor_up,
+    "monitor_down": CMD_monitor_down,
+    "keyboard_up": CMD_keyboard_up,
+    "keyboard_down": CMD_keyboard_down,
+    "monitor_tilt_up": CMD_monitor_tilt_up,
+    "monitor_tilt_down": CMD_monitor_tilt_down,
+}
+
+# Dictionary to track active continuous tasks.
+# For each command (e.g. "head_up"), we store a dict with keys: 'task' and 'last_update'
+continuous_tasks = {}
+
+# Timeout: if no repeated message arrives within this many seconds, cancel the continuous command.
+CONTINUOUS_TIMEOUT = 0.3
+
+async def mqtt_command_handler():
+    async with Client(MQTT_BROKER, port=MQTT_PORT, username=MQTT_USERNAME, password=MQTT_PASSWORD) as client:
+        await client.subscribe(MQTT_TOPIC)
+        print(f"Subscribed to MQTT topic: {MQTT_TOPIC}")
+        async for message in client.messages:
+            payload = message.payload.decode().strip()
+            print(f"Received MQTT message: {payload}")
+
+            if payload.startswith("start_"):
+                cmd = payload[6:]  # e.g. "head_up"
+                if cmd in CONTINUOUS_COMMANDS:
+                    now = asyncio.get_event_loop().time()
+                    if cmd in continuous_tasks:
+                        # Update the last update time.
+                        continuous_tasks[cmd]['last_update'] = now
+                    else:
+                        # Start a new continuous task.
+                        task = asyncio.create_task(bed_controller.continuous_command(CONTINUOUS_COMMANDS[cmd]))
+                        continuous_tasks[cmd] = {'task': task, 'last_update': now}
+                        print(f"Started continuous command: {cmd}")
+                else:
+                    print(f"Unknown continuous command: {cmd}")
+
+            elif payload in ONE_SHOT_COMMANDS:
+                asyncio.create_task(ONE_SHOT_COMMANDS[payload]())
+            else:
+                print(f"Unknown command received: {payload}")
+
+async def continuous_task_monitor():
+    while True:
+        now = asyncio.get_event_loop().time()
+        to_cancel = []
+        for cmd, info in continuous_tasks.items():
+            if now - info['last_update'] > CONTINUOUS_TIMEOUT:
+                to_cancel.append(cmd)
+        for cmd in to_cancel:
+            task = continuous_tasks[cmd]['task']
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                print(f"Stopped continuous command: {cmd}")
+            continuous_tasks.pop(cmd, None)
+        await asyncio.sleep(0.1)
+
+async def ble_connection_monitor():
+    while True:
+        if not bed_controller.client.is_connected:
+            print("BLE disconnected, attempting reconnect...")
+            await bed_controller.connect()
+        await asyncio.sleep(5)
+
+################################################################################
+#                           MAIN ENTRY POINT
+################################################################################
+
+async def main():
+    await bed_controller.connect()
+    mqtt_task = asyncio.create_task(mqtt_command_handler())
+    monitor_task = asyncio.create_task(ble_connection_monitor())
+    continuous_monitor_task = asyncio.create_task(continuous_task_monitor())
+    await asyncio.gather(mqtt_task, monitor_task, continuous_monitor_task)
+
+if __name__ == "__main__":
+    asyncio.run(main())
