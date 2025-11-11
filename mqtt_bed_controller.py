@@ -103,49 +103,61 @@ bed_controller = BedController(BED_ADDRESS, WRITE_CHAR_UUID)
 ################################################################################
 
 # One-shot (tap) functions.
-async def head_up():
-    print("One-shot: Head Up")
-    await bed_controller.one_off_command(CMD_HEAD_UP)
+async def monitor_up():
+    print("One-shot: Monitor Up")
+    await bed_controller.one_off_command(start_monitor_up)
 
-async def head_down():
-    print("One-shot: Head Down")
-    await bed_controller.one_off_command(CMD_HEAD_DOWN)
+async def monitor_down():
+    print("One-shot: Monitor Down")
+    await bed_controller.one_off_command(start_monitor_down)
 
-async def back_up():
-    print("One-shot: Back Up")
-    await bed_controller.one_off_command(CMD_BACK_TILT_UP)
+async def keyboard_up():
+    print("One-shot: Keyboard Up")
+    await bed_controller.one_off_command(start_keyboard_up)
 
-async def back_down():
-    print("One-shot: Back Down")
-    await bed_controller.one_off_command(CMD_BACK_TILT_DOWN)
+async def keyboard_down():
+    print("One-shot: Keyboard Down")
+    await bed_controller.one_off_command(start_keyboard_down)
 
-async def leg_up():
-    print("One-shot: Leg Up")
-    await bed_controller.one_off_command(CMD_LEG_UP)
+async def monitor_tilt_up():
+    print("One-shot: Monitor Tilt Up")
+    await bed_controller.one_off_command(start_monitor_tilt_up)
 
-async def leg_down():
-    print("One-shot: Leg Down")
-    await bed_controller.one_off_command(CMD_LEG_DOWN)
+async def monitor_tilt_down():
+    print("One-shot: Monitor Tilt Down")
+    await bed_controller.one_off_command(start_monitor_tilt_down)
 
-async def sit():
-    print("Sitting...")
-    await bed_controller.one_off_command(CMD_SIT)
+async def preset_one():
+    print("Preset One...")
+    await bed_controller.one_off_command(preset_one)
 
-async def zero_g():
-    print("Zero-G...")
-    await bed_controller.one_off_command(CMD_ZERO_G)
+async def preset_two():
+    print("Preset Two...")
+    await bed_controller.one_off_command(preset_two)
 
-async def flat():
-    print("Flat...")
-    await bed_controller.one_off_command(CMD_FLAT)
+async def preset_three():
+    print("Preset Three...")
+    await bed_controller.one_off_command(preset_three)
 
-async def vibrate_head():
-    print("Vibrate Head...")
-    await bed_controller.one_off_command(CMD_VIBRATE_HEAD)
+async def set_preset_one():
+    print("Set Preset One...")
+    await bed_controller.one_off_command(set_preset_one)
 
-async def vibrate_feet():
-    print("Vibrate Feet...")
-    await bed_controller.one_off_command(CMD_VIBRATE_FEET)
+async def set_preset_two():
+    print("Set Preset Two...")
+    await bed_controller.one_off_command(set_preset_two)
+
+async def set_preset_three():
+    print("Set Preset Three...")
+    await bed_controller.one_off_command(set_preset_three)
+
+async def calibrate():
+    print("Calibrate...")
+    await bed_controller.one_off_command(calibrate)
+
+async def emergency_stop():
+    print("Emergency Stop...")
+    await bed_controller.one_off_command(emergency_stop)
 
 ################################################################################
 #                   MQTT INTEGRATION & CONTINUOUS TASKS
