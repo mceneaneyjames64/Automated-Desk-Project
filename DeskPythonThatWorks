@@ -8,7 +8,7 @@ from aiomqtt import Client, MqttError
 #                           CONFIGURATION & BLE SETUP
 ################################################################################
 
-BED_ADDRESS = "B8:27:EB:CD:57:6C"
+BED_ADDRESS = "B8:27:EB:CD:57:6C"                            #test raspberry pi address
 WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"
 NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"
 
