@@ -160,27 +160,28 @@ MQTT_PASSWORD = "VMIececapstone" #Broker password
 
 # One-shot command mapping.
 ONE_SHOT_COMMANDS = {
-    "head_up": head_up,
-    "head_down": head_down,
-    "back_up": back_up,
-    "back_down": back_down,
-    "leg_up": leg_up,
-    "leg_down": leg_down,
-    "sit": sit,
-    "zero_g": zero_g,
-    "flat": flat,
-    "vibrate_head": vibrate_head,
-    "vibrate_feet": vibrate_feet,
+    "monitor_up": monitor_up,
+    "monitor_down": monitor_down,
+    "keyboard_up": keyboard_up,
+    "keyboard_down": keyboard_down,
+    "monitor_tilt_up": monitor_tilt_up,
+    "monitor_tilt_down": monitor_tilt_down,
+    "preset_one": preset_one,
+    "preset_two": preset_two,
+    "preset_three": preset_three,
+    "set_preset_one": set_preset_one,
+    "set_preset_two": set_preset_two,
+    "set_preset_three": set_preset_three,
 }
 
 # Mapping for continuous (hold) commands.
 CONTINUOUS_COMMANDS = {
-    "head_up": CMD_HEAD_UP,
-    "head_down": CMD_HEAD_DOWN,
-    "back_up": CMD_BACK_TILT_UP,
-    "back_down": CMD_BACK_TILT_DOWN,
-    "leg_up": CMD_LEG_UP,
-    "leg_down": CMD_LEG_DOWN,
+    "monitor_up": start_monitor_up,
+    "monitor_down": start_monitor_down,
+    "keyboard_up": start_keyboard_up,
+    "keyboard_down": start_keyboard_down,
+    "monitor_tilt_up": start_monitor_tilt_up,
+    "monitor_tilt_down": start_monitor_tilt_down,
 }
 
 # Dictionary to track active continuous tasks.
