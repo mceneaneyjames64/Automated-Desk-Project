@@ -1,75 +1,108 @@
 #This file is intended for the Python code
 
-import paho.mqtt.client as mqtt
+import asyncio
+from bleak import BleakClient
+from aiomqtt import Client, MqttError
 
-#function to pass message with preset data
-def passPreset(qos, preset):
+#FIX ME: ADD BLUETOOTH ADDRESS AND FIX UUIDs FOR WRITING AND NITIFYING IF NEEDED
+DESK_ADDRESS = "" 
+WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"
+NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"
 
-  if (preset == 1):
-    #placeholder values used for positions as of right now
-    preset1x = 0
-    preset1y = 0
-    preset1z = 0
+# Command constants for the desk.
+#protocol for talking to desk, when code received, desk knows to move
+CMD_KEYBOARD_UP = 0x10 #code to move keyboard holder part of desk up
+CMD_KEYBOARD_DOWN = 0x20 # code to move keyboard holder down
 
-    #publish the x, y, and z coordinates needed for the preset position
-    client.publish("desk/cmd/preset", preset1x, qos)
-    client.publish("desk/cmd/preset", preset1y, qos)
-    client.publish("desk/cmd/preset", preset1z, qos)
+CMD_ROTATE_MONITOR_UP = 0x1 #code to rotate/tilt the monitor upwards
+CMD_ROTATE_MONITOR_DOWN = 0x2 #code to rotate/tilt the monitor downwards
 
-  elif(preset == 2)
-    #placeholder values used for positions as of right now
-    preset2x = 3
-    preset2y = 4
-    preset2z = 5
+CMD_RAISE_MONITOR = 0x4 #code to raise the monitor up
+CMD_LOWER_MONITOR = 0x8 #code to lower the monitor down
 
-    #publish the x, y, and z coordinates needed for the preset position
-    client.publish("desk/cmd/preset", preset2x, qos)
-    client.publish("desk/cmd/preset", preset2y, qos)
-    client.publish("desk/cmd/preset", preset2z, qos)
+#####################################################################################
+#                         BLUETOOTH UTILITY FUNCTIONS
+#####################################################################################
 
-  elif(preset == 3)
-    #placeholder values used for positions as of right now
-    preset3x = 3
-    preset3y = 4
-    preset3z = 5
+def calc_checksum(packet: bytearray) -> int:
+    total = sum(packet[:-1])
+    return (~total) & 0xFF
 
-    #publish the x, y, and z coordinates needed for the preset position
-    client.publish("desk/cmd/preset", preset3x, qos)
-    client.publish("desk/cmd/preset", preset3y, qos)
-    client.publish("desk/cmd/preset", preset3z, qos)
+def build_desk_command(key: int) -> bytes:
+    pkt = bytearray(8)
+    pkt[0] = 0xE5
+    pkt[1] = 0xFE
+    pkt[2] = 0x16
+    pkt[3] = (key >> 0) & 0xFF
+    pkt[4] = (key >> 8) & 0xFF
+    pkt[5] = (key >> 16) & 0xFF
+    pkt[6] = (key >> 24) & 0xFF
+    pkt[7] = calc_checksum(pkt)
+    return bytes(pkt)
 
-  else
-    #keep the position of the desk if no preset button is triggered
-    client.publish("desk/cmd/preset", "The position is to remain the same", qos)
+######################################################################################
+#                              DESK CONTROLLER CLASS
+######################################################################################
 
-def passDefinedLocation(x, y, z, qos):
-  #this function passes a location where the x, y, and z coordinates are known
-  client.publish("desk/cmd/defLoc", x, qos)
-  client.publish("desk/cmd/defLoc", y, qos)
-  client.publish("desk/cmd/defLoc", z, qos)
+class DeskController:
+    #addresses
+    def __init__(self, address: str, write_char_uuid: str):
+        self.address = address
+        self.write_char_uuid = write_char_uuid
+        self.client = BleakClient(address)
+        self.lock = asyncio.Lock()
+
+    async def connect(self):
+        #connect to bluetooth with address supplied
+        if not self.client.is_connected:
+            try:
+                await self.client.connect()
+                print("BLE connected")
+            except Exception as e:
+                print("BLE connection error:", e)
+
+    async def ensure_connected(self):
+        #ensure that the bluetooth is running
+        #returns conenction or runs through again depending on outcome
+        if not self.client.is_connected:
+            print("BLE not connected, attempting reconnect...")
+            await self.connect()
+        return self.client.is_connected
+
+    async def write_command(self, command_key: int):
+        #writes to bed, publishes messages on error
+        if await self.ensure_connected():
+            cmd = build_desk_command(command_key) #see line 31 for function
+            async with self.lock:
+                try:
+                    await self.client.write_gatt_char(self.write_char_uuid, cmd)
+                except Exception as e:
+                    print("Error writing command:", e)
+                    await self.client.disconnect()
+                    await self.connect()
+        else:
+            print("Could not connect to BLE device.")
+
+    async def one_off_command(self, command_key: int):
+        #equivalent to a preset command
+        await self.write_command(command_key)
+
+    async def continuous_command(self, command_key: int):
+        #up/down button on remote function
+        try:
+            while True:
+                await self.write_command(command_key)
+                await asyncio.sleep(0.1)
+        except asyncio.CancelledError:
+            print(f"Continuous command {command_key} cancelled.")
+            # Clean exit on cancellation.
+
+# Global controller instance.
+desk_controller = DeskController(DESK_ADDRESS, WRITE_CHAR_UUID)
+
+####################################################################################
+#                          MOVEMENT FUNCTIONS
+####################################################################################
 
 
-def main():
-  #main portion of the file
 
-  # initalize mqtt client
-  client = mqtt.Client(
-  protocol = mqtt.MQTTv5
-  )
-
-  try:
-    #start the infinite loop
-    client.loop_start()
-
-    while True:
-      #pass is when no value here, functions should be called in this part
-      pass
-
-  finally:
-    #end the infinite loop and disconnect from the pi
-    client.loop_stop()
-    client.disconnect()
-
-  #end the file with call to main
-if__name__ == '__main__':
-  main()
