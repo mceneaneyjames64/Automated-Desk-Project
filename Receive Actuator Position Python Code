@@ -1,20 +1,26 @@
 import asyncio
 from bleak import BleakClient
 
-ADDRESS = "XX:XX:XX:XX:XX:XX"  # Replace with actuator BLE MAC address
-CHARACTERISTIC_UUID = "YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY"  # Replace with actuator's characteristic UUID
+ADDRESS = "XX:XX:XX:XX:XX:XX"
+CHARACTERISTIC_UUID = "YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY"
+NUM_ACTUATORS = 2  
 
-def handle_position(sender, data): # Parsing of this function will depend on actuator's data format
-    position = int.from_bytes(data, byteorder="little")  # or whatever format the actuator uses
-    print(f"Received position: {position}")
+def handle_positions(sender, data):
+    positions = []
+    for i in range(NUM_ACTUATORS):
+        start = i * 2  # For 16-bit int per actuator
+        pos = int.from_bytes(data[start:start+2], byteorder="little")
+        positions.append(pos)
+    print(f"Received positions: {positions}")
 
 async def run(address, char_uuid):
     async with BleakClient(address) as client:
-        await client.start_notify(char_uuid, handle_position)
+        await client.start_notify(char_uuid, handle_positions)
         while True:
-            await asyncio.sleep(1) 
+            await asyncio.sleep(1)
 
 if __name__ == "__main__":
     asyncio.run(run(ADDRESS, CHARACTERISTIC_UUID))
 
-# Code needs to be modified to be able to handle multiple actuators' positions
+
+# Code assumes all actuator positions are sent from a single characteristic
