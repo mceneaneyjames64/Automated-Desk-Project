@@ -24,3 +24,4 @@ if __name__ == "__main__":
 
 
 # Code assumes all actuator positions are sent from a single characteristic
+# If each actuator has its own BLE MAC address and characteristic, code needs to be changed 
