@@ -1,0 +1,7 @@
+### **`requirements.txt`** ###
+
+adafruit-circuitpython-vl53l0x
+adafruit-circuitpython-tca9548a
+adafruit-circuitpython-adxl34x
+pyserial
+pynput
