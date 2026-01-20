@@ -4,16 +4,11 @@
 #Have NOT begun this process due to lack of comments explainig the code
 
 import asyncio
-from bleak import BleakClient
 from aiomqtt import Client, MqttError
 
 ################################################################################
-#                           CONFIGURATION & BLE SETUP
+#                           CONFIGURATION
 ################################################################################
-
-DESK_ADDRESS = "B8:27:EB:CD:57:6C"                            #test raspberry pi address
-WRITE_CHAR_UUID = "0000ffe9-0000-1000-8000-00805f9b34fb"     #need to find pi equivalent                                      #
-NOTIFY_CHAR_UUID = "0000ffe4-0000-1000-8000-00805f9b34fb"    #need to find pi equivalent                                      #
 
 # Command constants for the desk.
 CMD_monitor_up = 0x1
@@ -32,62 +27,41 @@ CMD_calibrate = 0x13
 CMD_emergency_stop =0x14
 
 ################################################################################
-#                           BLE UTILITY FUNCTIONS
-################################################################################
-
-def calc_checksum(packet: bytearray) -> int:                                                                                   #
-    total = sum(packet[:-1])                                                                                                   #
-    return (~total) & 0xFF                                                                                                     #
-
-def build_desk_command(key: int) -> bytes:                                                                                     #
-    pkt = bytearray(8)                                                                                                         #
-    pkt[0] = 0xE5                                                                                                              #
-    pkt[1] = 0xFE                                                                                                              #
-    pkt[2] = 0x16                                                                                                              #
-    pkt[3] = (key >> 0) & 0xFF                                                                                                 #
-    pkt[4] = (key >> 8) & 0xFF                                                                                                 #
-    pkt[5] = (key >> 16) & 0xFF                                                                                                #
-    pkt[6] = (key >> 24) & 0xFF                                                                                                #
-    pkt[7] = calc_checksum(pkt)                                                                                                #
-    return bytes(pkt)                                                                                                          #
-
-################################################################################
 #                           DESK CONTROLLER CLASS
 ################################################################################
 
 class DeskController:
-    def __init__(self, address: str, write_char_uuid: str):                                                                     #
+    def __init__(self, address: str):
         self.address = address
-        self.write_char_uuid = write_char_uuid                                                                                  #
-        self.client = BleakClient(address)                                                                                      #
+        self.client = 8883         #default port, secured with TSL/SSL
         self.lock = asyncio.Lock()
 
     async def connect(self):
-        if not self.client.is_connected:                                                                                        #
-            try:                                                                                                                #
-                await self.client.connect()                                                                                     #
-                print("BLE connected")                                                                                          #
-            except Exception as e:                                                                                              #
-                print("BLE connection error:", e)                                                                               #
+        if not self.client.is_connected:
+            try:
+                await self.client.connect()
+                print("MQTT connected")
+            except Exception as e:
+                print("MQTT connection error:", e)
 
     async def ensure_connected(self):
         if not self.client.is_connected:
-            print("BLE not connected, attempting reconnect...")                                                                 #
-            await self.connect()                                                                                                #
-        return self.client.is_connected                                                                                         #
+            print("MQTT not connected, attempting reconnect...")
+            await self.connect()
+        return self.client.is_connected
 
     async def write_command(self, command_key: int):
         if await self.ensure_connected():
             cmd = build_desk_command(command_key)
             async with self.lock:
                 try:
-                    await self.client.write_gatt_char(self.write_char_uuid, cmd)                                                #
+                    await self.client.publish("desk/command", cmd, qos = 1)
                 except Exception as e:
                     print("Error writing command:", e)
                     await self.client.disconnect()
                     await self.connect()
         else:
-            print("Could not connect to BLE device.")                                                                            #
+            print("Could establish MQTT connection.")
 
     async def one_off_command(self, command_key: int):
         await self.write_command(command_key)
@@ -102,7 +76,7 @@ class DeskController:
             # Clean exit on cancellation.
 
 # Global controller instance.
-desk_controller = DeskController(DESK_ADDRESS, WRITE_CHAR_UUID)                                                                  #
+desk_controller = DeskController(DESK_ADDRESS)
 
 ################################################################################
 #                           MOVEMENT FUNCTIONS
@@ -256,12 +230,12 @@ async def continuous_task_monitor():
             continuous_tasks.pop(cmd, None)
         await asyncio.sleep(0.1)
 
-async def ble_connection_monitor():                                                                                        #
-    while True:                                                                                                            #
-        if not desk_controller.client.is_connected:                                                                        #
-            print("BLE disconnected, attempting reconnect...")                                                             #
-            await desk_controller.connect()                                                                                #
-        await asyncio.sleep(5)                                                                                             #
+async def mqtt_connection_monitor():
+    while True:
+        if not desk_controller.client.is_connected:
+            print("MQTT disconnected, attempting reconnect...")
+            await desk_controller.connect()
+        await asyncio.sleep(5)
 
 ################################################################################
 #                           MAIN ENTRY POINT
@@ -270,7 +244,7 @@ async def ble_connection_monitor():                                             
 async def main():
     await desk_controller.connect()
     mqtt_task = asyncio.create_task(mqtt_command_handler())
-    monitor_task = asyncio.create_task(ble_connection_monitor())                                                            #
+    monitor_task = asyncio.create_task(mqtt_connection_monitor())
     continuous_monitor_task = asyncio.create_task(continuous_task_monitor())
     await asyncio.gather(mqtt_task, monitor_task, continuous_monitor_task)
 
