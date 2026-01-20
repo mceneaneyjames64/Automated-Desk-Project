@@ -4,6 +4,7 @@
 #Have NOT begun this process due to lack of comments explainig the code
 
 import asyncio
+import paho.mqtt.client as paho
 from aiomqtt import Client, MqttError
 
 ################################################################################
@@ -40,6 +41,7 @@ class DeskController:
         if not self.client.is_connected:
             try:
                 await self.client.connect()
+                await self.client.subsrcibe(home/desk/command, qos = 1)
                 print("MQTT connected")
             except Exception as e:
                 print("MQTT connection error:", e)
@@ -55,7 +57,7 @@ class DeskController:
             cmd = build_desk_command(command_key)
             async with self.lock:
                 try:
-                    await self.client.publish("desk/command", cmd, qos = 1)
+                    await self.client.publish("home/desk/command", cmd, qos = 1)
                 except Exception as e:
                     print("Error writing command:", e)
                     await self.client.disconnect()
