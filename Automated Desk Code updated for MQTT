@@ -1,8 +1,5 @@
 #!/home/jd/Dev/DeskControl/.venv/bin/python
 
-#Lines with '#' at the end need to either be deleted or modified to remove BLE to be replaced by MQTT
-#Have NOT begun this process due to lack of comments explainig the code
-
 import asyncio
 import paho.mqtt.client as paho
 from aiomqtt import Client, MqttError
@@ -28,120 +25,65 @@ CMD_calibrate = 0x13
 CMD_emergency_stop =0x14
 
 ################################################################################
-#                           DESK CONTROLLER CLASS
-################################################################################
-
-class DeskController:
-    def __init__(self, address: str):
-        self.address = address
-        self.client = 8883         #default port, secured with TSL/SSL
-        self.lock = asyncio.Lock()
-
-    async def connect(self):
-        if not self.client.is_connected:
-            try:
-                #await self.client.connect()
-                await self.client.subsrcibe(home/desk/command, qos = 1)
-                print("MQTT connected")
-            except Exception as e:
-                print("MQTT connection error:", e)
-
-    async def ensure_connected(self):
-        if not self.client.is_connected:
-            print("MQTT not connected, attempting reconnect...")
-            #await self.connect()
-            await self.client.subsrcibe(home/desk/command, qos = 1)
-        return self.client.is_connected
-
-    async def write_command(self, command_key: int):
-        if await self.ensure_connected():
-            cmd = build_desk_command(command_key)
-            async with self.lock:
-                try:
-                    await self.client.publish("home/desk/command", cmd, qos = 1)
-                except Exception as e:
-                    print("Error writing command:", e)
-                    #await self.client.disconnect()
-                    #await self.connect()
-                    await self.client.subsrcibe(home/desk/command, qos = 1)
-        else:
-            print("Could establish MQTT connection.")
-
-    async def one_off_command(self, command_key: int):
-        await self.write_command(command_key)
-
-    async def continuous_command(self, command_key: int):
-        try:
-            while True:
-                await self.write_command(command_key)
-                await asyncio.sleep(0.1)
-        except asyncio.CancelledError:
-            print(f"Continuous command {command_key} cancelled.")
-            # Clean exit on cancellation.
-
-# Global controller instance.
-desk_controller = DeskController(DESK_ADDRESS)
-
-################################################################################
 #                           MOVEMENT FUNCTIONS
 ################################################################################
 
 # One-shot (tap) functions.
 async def monitor_up():
     print("One-shot: Monitor Up")
-    await desk_controller.one_off_command(CMD_monitor_up)
+    #await desk_controller.one_off_command(CMD_monitor_up)
 
 async def monitor_down():
     print("One-shot: Monitor Down")
-    await desk_controller.one_off_command(CMD_monitor_down)
+    #await desk_controller.one_off_command(CMD_monitor_down)
 
 async def keyboard_up():
     print("One-shot: Keyboard Up")
-    await desk_controller.one_off_command(CMD_keyboard_up)
+    #await desk_controller.one_off_command(CMD_keyboard_up)
 
 async def keyboard_down():
     print("One-shot: Keyboard Down")
-    await desk_controller.one_off_command(CMD_keyboard_down)
+    #await desk_controller.one_off_command(CMD_keyboard_down)
 
 async def monitor_tilt_up():
     print("One-shot: Monitor Tilt Up")
-    await desk_controller.one_off_command(CMD_monitor_tilt_up)
+    #await desk_controller.one_off_command(CMD_monitor_tilt_up)
 
 async def monitor_tilt_down():
     print("One-shot: Monitor Tilt Down")
-    await desk_controller.one_off_command(CMD_monitor_tilt_down)
+    #await desk_controller.one_off_command(CMD_monitor_tilt_down)
 
 async def preset_one():
     print("Preset One...")
-    await desk_controller.one_off_command(CMD_preset_one)
+    #await desk_controller.one_off_command(CMD_preset_one)
 
 async def preset_two():
     print("Preset Two...")
-    await desk_controller.one_off_command(CMD_preset_two)
+    #await desk_controller.one_off_command(CMD_preset_two)
 
 async def preset_three():
     print("Preset Three...")
-    await desk_controller.one_off_command(CMD_preset_three)
+    #await desk_controller.one_off_command(CMD_preset_three)
 
 async def set_preset_one():
     print("Set Preset One...")
-    await desk_controller.one_off_command(CMD_set_preset_one)
+    #await desk_controller.one_off_command(CMD_set_preset_one)
 
 async def set_preset_two():
     print("Set Preset Two...")
-    await desk_controller.one_off_command(CMD_set_preset_two)
+    #await desk_controller.one_off_command(CMD_set_preset_two)
 
 async def set_preset_three():
     print("Set Preset Three...")
-    await desk_controller.one_off_command(CMD_set_preset_three)
+    #await desk_controller.one_off_command(CMD_set_preset_three)
 
 async def calibrate():
     print("Calibrate...")
-    await desk_controller.one_off_command(CMD_calibrate)
+    #await desk_controller.one_off_command(CMD_calibrate)
 
 async def emergency_stop():
     print("Emergency Stop...")
-    await desk_controller.one_off_command(CMD_emergency_stop)
+    #await desk_controller.one_off_command(CMD_emergency_stop)
 
 ################################################################################
 #                   MQTT INTEGRATION & CONTINUOUS TASKS
@@ -234,23 +176,14 @@ async def continuous_task_monitor():
             continuous_tasks.pop(cmd, None)
         await asyncio.sleep(0.1)
 
-async def mqtt_connection_monitor():
-    while True:
-        if not desk_controller.client.is_connected:
-            print("MQTT disconnected, attempting reconnect...")
-            await desk_controller.connect()
-        await asyncio.sleep(5)
-
 ################################################################################
 #                           MAIN ENTRY POINT
 ################################################################################
 
 async def main():
-    await desk_controller.connect()
     mqtt_task = asyncio.create_task(mqtt_command_handler())
-    monitor_task = asyncio.create_task(mqtt_connection_monitor())
     continuous_monitor_task = asyncio.create_task(continuous_task_monitor())
-    await asyncio.gather(mqtt_task, monitor_task, continuous_monitor_task)
+    await asyncio.gather(mqtt_task, continuous_monitor_task)
 
 if __name__ == "__main__":
     asyncio.run(main())
