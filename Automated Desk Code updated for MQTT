@@ -89,7 +89,7 @@ async def continuous_command(command_key: int):
         #up/down button on remote function
         try:
             while True:
-                await write_command(command_key)
+                #await write_command(command_key)
                 await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             print(f"Continuous command {command_key} cancelled.")
