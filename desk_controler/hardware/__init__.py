@@ -10,4 +10,5 @@ __all__ = [
     'init_adxl345',
     'get_sensor_value',
     'init_serial'
+
 ]
