@@ -1,6 +1,6 @@
-# Hardware Control System - Code Explanation
+# Hardware Control System 
 
-## 📋 Table of Contents
+##  Table of Contents
 1. [System Overview](#system-overview)
 2. [Hardware Components](#hardware-components)
 3. [Code Flow](#code-flow)
@@ -10,62 +10,100 @@
 
 ---
 
-## 🎯 System Overview
+## System Overview
 
-This is a **hardware control system** that manages a motorized positioning station with multiple sensors. Think of it like a robotic arm or linear actuator that can:
+This is a **hardware control application** that manages a motorized over the bed workstation with multiple sensors. The main functions of the application are:
 
-- **Move to precise positions** using motor control
-- **Measure distance** using laser sensors (VL53L0X)
-- **Detect motion/vibration** using an accelerometer (ADXL345)
-- **Calibrate itself** to know its baseline/home position
-- **Communicate** with motor controllers via serial port
+- **Move to precise positions** using closed loop motor control
+- **Measure distance** using time of flight sensors (Adafruit VL53L0X) via I2C
+- **Measure angle** using an accelerometer (Adafruit ADXL345) via I2C
+- **Calibrate itself** to apply offset and account for non-linear effects
+- **Communicate** with existing control box via serial port and Home Assistant server via MQTT
 
-### Real-World Analogy
-Imagine a 3D printer's print head that needs to:
-- Know exactly where it is (distance sensors)
-- Move to specific positions (motor control)
-- Know when it's "home" (calibration)
-- Detect if something bumps it (accelerometer)
+## Hardware Architecture
+```mermaid
+graph TD
+    RPI["Raspberry Pi<br/>────────────<br/>Main Controller"]
+    
+    RPI -->|I2C Bus<br/>SDA/SCL| MUX["TCA9548A<br/>I2C Multiplexer<br/>────────────<br/>8 Channels"]
+    RPI -->|Serial/UART| MOTOR["Motor Controller<br/>────────────<br/>Position Control"]
+    RPI -->|Network| SERVER["Server<br/>────────────<br/>Command & Control"]
+    
+    MUX -->|Channel 0| VL1["VL53L0X<br/>Distance Sensor #1"]
+    MUX -->|Channel 1| VL2["VL53L0X<br/>Distance Sensor #2"]
+    MUX -->|Channel 1| ACCEL["ADXL345<br/>3-Axis Accelerometer"]
+    
+    MOTOR --> ACTUATOR["Motor/Actuator<br/>────────────<br/>Physical Movement"]
+    
+    style RPI fill:#e1f5ff,stroke:#333,stroke-width:3px
+    style MUX fill:#fff4cc,stroke:#333,stroke-width:3px
+    style VL1 fill:#ccffcc,stroke:#333,stroke-width:2px
+    style VL2 fill:#ccffcc,stroke:#333,stroke-width:2px
+    style ACCEL fill:#ffcccc,stroke:#333,stroke-width:2px
+    style MOTOR fill:#e1d5ff,stroke:#333,stroke-width:3px
+    style SERVER fill:#ffe1e1,stroke:#333,stroke-width:3px
+    style ACTUATOR fill:#d5f5e3,stroke:#333,stroke-width:2px
+```
 
+**System Components:**
+
+| Component | Function | Connection |
+|-----------|----------|------------|
+| **Raspberry Pi** | Main controller & processing | - |
+| **TCA9548A** | I2C multiplexer (8 channels) | I2C Bus |
+| **VL53L0X #1** | Distance sensor | Channel 0 |
+| **VL53L0X #2** | Distance sensor | Channel 1 |
+| **ADXL345** | 3-axis accelerometer | Channel 1 |
+| **Motor Controller** | Position control | Serial/UART |
+| **Server** | Remote command & monitoring | MQTT |
+
+**Communication Protocols:**
+- **I2C:** Sensor communication via multiplexer
+- **Serial/UART:** Motor control commands
+- **MQTT:** Server communication for remote control
 ---
 
-## 🔧 Hardware Components
+## Hardware Components
 
-### 1. **I2C Bus & Multiplexer (TCA9548A)**
-```
-┌─────────────────┐
-│  Raspberry Pi   │
-│   (or similar)  │
-└────────┬────────┘
-         │ I2C Bus (2 wires: SDA, SCL)
-         │
-    ┌────▼────┐
-    │   MUX   │ ← Multiplexer (TCA9548A)
-    │ TCA9548A│   Allows multiple devices on same I2C address
-    └─┬─┬─┬─┬─┘
-      │ │ │ │
-      Ch0,1,2,3... (8 channels)
+### 1. **TCA9548A I2C Multiplexer**
+- **What**: Eight Channel I2C Multiplexer
+- **How it works**: Creates eight virtual I2C buses that can be addresses from a single main bus. This allows devices with identical I2C addresses to be on the same main bus.
+- **Use case**: The I2C protocol only allows for one device with a certain address to be on any one bus. Because both the tine of flight sensors share the address 0x26, a multiplexer is needed to interface with both sensors. The accelerometer is also addressed through the mux for uniformity and ease on control in the code. Documentation from TI on the I2C protocol can be found [here](#https://www.ti.com/lit/an/sbaa565/sbaa565.pdf?ts=1770265206096&ref_url=https%253A%252F%252Fwww.bing.com%252F).
+- **Docs**: Documentation can be found on the Adafruit website [here](#https://learn.adafruit.com/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout?view=all&gad_source=1&gad_campaignid=21079267614&gclid=Cj0KCQiAnJHMBhDAARIsABr7b86WEk41wAFa5H2wmGuvtGGEHgq5V8cepWBIAK4iaK4CBcwsfKq3ofsaAslNEALw_wcB).
+
+
+```mermaid
+graph TD
+    A[Raspberry Pi] -->|I2C Bus<br/>2 Wires SDA & SCL| B[MUX TCA9548A]
+    B -->|Channel 0| C0[Device 0]
+    B -->|Channel 1| C1[Device 1]
+    B -->|Channel 2| C2[Device 2]
+    B -->|Channel 3| C3[Device 3]
+    B -->|Channel 4| C4[Device 4]
+    B -->|Channel 5| C5[Device 5]
+    B -->|Channel 6| C6[Device 6]
+    B -->|Channel 7| C7[Device 7]
+    
+    style B fill:#e1f5ff
+    style A fill:#ffe1e1
 ```
 
-**Why a multiplexer?**
-- VL53L0X sensors all use the same I2C address (0x29)
-- Can't have two devices with same address on same bus
-- Multiplexer creates 8 "virtual" I2C buses
-- You can put one sensor on each channel
+**Note:** The TCA9548A multiplexer allows multiple I2C devices with the same address to coexist on the bus by providing 8 independent channels. However in this project only channels 0, 1, and 2 are used.
 
 ### 2. **VL53L0X Distance Sensors (2x)**
 - **What**: Laser time-of-flight distance sensors
 - **Range**: ~30mm to 2000mm
 - **Accuracy**: ±3% 
 - **How it works**: Sends laser pulse, measures time for reflection
-- **Use case**: Tells you exactly how far extended the motor is
+- **Use case**: Used as the feedback method for the monitor and keyboard height linear actuators
+- **Docs**: Documentation can be found on the Adafruit website [here](#https://learn.adafruit.com/adafruit-vl53l0x-micro-lidar-distance-sensor-breakout).
 
-```
-Sensor → [═══════] ← Target Object
-         \       /
-          \ 150mm/
-           \   /
-            \_/
+```mermaid 
+graph LR 
+A[Sensor]  ---|150mm detection range| B[Reflector] 
+
+style A fill:#e1f5ff
+style B fill:#ffe1e1
 ```
 
 ### 3. **ADXL345 Accelerometer**
@@ -74,83 +112,134 @@ Sensor → [═══════] ← Target Object
 - **Output**: Acceleration in g's (gravity units)
   - Stationary: (0, 0, 9.8) = gravity pulling down
   - Moving: Changes in X, Y, Z values
+  - **Docs**: Documentation can be found on the Adafruit website [here](#https://www.adafruit.com/product/1231?gad_source=1&gad_campaignid=21079267614&gclid=Cj0KCQiAnJHMBhDAARIsABr7b86xpB53FGgP611S-nHp8bbQ6ZLXaWfghXusS2Xnw88LeZu_aI-UZJYaArQ8EALw_wcB).
+  - 
+```mermaid
+graph TD
+    A[Accelerometer<br/>IMU Sensor] --> X[X-Axis<br/>Left/Right]
+    A --> Y[Y-Axis<br/>Forward/Backward]
+    A --> Z[Z-Axis<br/>Up/Down]
+    
+    X -.->|Roll| M[Motion Detection]
+    Y -.->|Pitch| M
+    Z -.->|Yaw| M
+    
+    style A fill:#e1f5ff,stroke:#333,stroke-width:2px
+    style X fill:#ffcccc
+    style Y fill:#ccffcc
+    style Z fill:#ccccff
+    style M fill:#fff4cc
+```
+**Note**: FIXME add detail about only one axis being used
+
+#### Angle calculation:
+FIXME: add angle measurement equation
 
 ### 4. **Motor Controller (Serial Communication)**
-- **What**: Controls a stepper or DC motor
-- **Interface**: Serial port (UART) - sends byte commands
-- **Commands**: Move, Stop, Set Position, etc.
+-   **What**: interface between the Raspberry Pi and existing control box
+-   **Interface**: Serial port (UART) - sends byte commands FIXME: add serial port name
+-   **Commands**: Move, Stop, Set Position, etc. FIXME: Add commands from config .py
 
----
+**Note**: Commands sent form the raspberry Pi to the control box toggle the function. If the box is given and 
+extend command the actuator will not stop unless the stop command is given or the actuator runs into it upper limit.
 
-## 🔄 Code Flow
+## Directory Layout FIXME
+```
+project-name/
+├── src/
+│   ├── __init__.py
+│   ├── main.py                    # Main application entry point
+│   ├── config/
+│   │   ├── __init__.py
+│   │   ├── settings.py            # Configuration settings
+│   │   └── calibration.json       # Calibration data
+│   ├── hardware/
+│   │   ├── __init__.py
+│   │   ├── i2c_manager.py         # I2C bus management
+│   │   ├── multiplexer.py         # TCA9548A multiplexer
+│   │   ├── vl53l0x_sensor.py      # Distance sensors
+│   │   ├── adxl345_sensor.py      # Accelerometer
+│   │   └── motor_controller.py    # Serial motor control
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── calibration.py         # Calibration routines
+│   │   ├── position_controller.py # Position control logic
+│   │   └── heartbeat.py           # Heartbeat monitoring
+│   ├── communication/
+│   │   ├── __init__.py
+│   │   ├── server_client.py       # Server communication
+│   │   └── protocol.py            # Command protocol
+│   └── utils/
+│       ├── __init__.py
+│       ├── logger.py              # Logging utilities
+│       └── helpers.py             # Helper functions
+├── tests/
+│   ├── __init__.py
+│   ├── test_sensors.py
+│   ├── test_calibration.py
+│   └── test_motor_control.py
+├── docs/
+│   ├── hardware_setup.md
+│   ├── calibration_guide.md
+│   └── api_reference.md
+├── requirements.txt               # Python dependencies
+├── README.md                      # Project documentation
+├── .gitignore
+└── LICENSE
+```
+
+## Code Flow
 
 ### Main Program Execution Flow
+```mermaid
+flowchart TD
+    START([START]) --> A[Initialize I2C Bus]
+    A --> B[Initialize Multiplexer<br/>TCA9548A]
+    B --> C[Initialize VL53L0X Sensors<br/>Channels 0 & 1]
+    C --> D[Initialize ADXL345<br/>Channel 2]
+    D --> E[Initialize Serial Port<br/>Motor Control]
+    E --> F{Calibration<br/>File Exists?}
+    
+    F -->|No| G[Run Calibration<br/>Measure Baseline Positions]
+    F -->|Yes| H[Load Calibration<br/>from File]
+    
+    G --> I[Start Heartbeat]
+    H --> I
+    
+    I --> J[Main Loop]
+    J --> K[Receive Command<br/>from Server]
+    K --> L[Move to Position]
+    L --> M[Report Position]
+    M --> J
+    
+    style START fill:#e1f5ff
+    style F fill:#fff4cc
+    style J fill:#ccffcc
+    style I fill:#ffcccc
+```
 
-```
-START
-  │
-  ├─→ Initialize I2C Bus
-  │
-  ├─→ Initialize Multiplexer (TCA9548A)
-  │
-  ├─→ Initialize VL53L0X Sensors (on channels 1 & 2)
-  │
-  ├─→ Initialize ADXL345 (on another channel)
-  │
-  ├─→ Initialize Serial Port (for motor control)
-  │
-  ├─→ Load or Create Calibration Data
-  │    │
-  │    ├─→ If no calibration file exists:
-  │    │    └─→ Run calibration (measure baseline positions)
-  │    │
-  │    └─→ If calibration exists:
-  │         └─→ Load from file
-  │
-  ├─→ Perform Motor Movements
-  │    │
-  │    ├─→ Move to absolute position (100mm)
-  │    ├─→ Move relative to baseline (+50mm from home)
-  │    ├─→ Retract to home position
-  │    └─→ Emergency stop
-  │
-  └─→ Continuous Monitoring Loop
-       │
-       └─→ Read sensors every 10 seconds
-           ├─→ VL53L0X #1 distance
-           ├─→ VL53L0X #2 distance
-           └─→ ADXL345 acceleration
-```
+**Initialization Sequence:**
+1. I2C Bus setup
+2. TCA9548A multiplexer configuration
+3. VL53L0X distance sensors (channels 0 & 1)
+4. ADXL345 accelerometer (channel 1)
+5. Serial port for motor control
+6. Calibration data handling
+7. Heartbeat monitoring
+
+**Main Loop:**
+- Continuously receives commands from server
+- Executes position movements
+- Reports current position back to server
+
 
 ---
 
-## 📖 Detailed Function Explanations
+## Detailed Function Explanations
 
 ### 1. `init_all_hardware()`
 
 **Purpose**: Initialize all hardware components in the correct order
-
-```python
-def init_all_hardware():
-    sensors = {}
-    
-    # Step 1: Initialize I2C bus
-    i2c = init_i2c()  # Creates I2C connection
-    
-    # Step 2: Initialize multiplexer
-    tca = init_mux(i2c)  # Sets up the 8-channel switch
-    sensors["mux"] = tca
-    
-    # Step 3: Initialize distance sensors on different channels
-    sensors["vl53l0x_0"] = init_vl53l0x(tca, config.VL53_CHANNEL_1, "VL53L0X #1")
-    sensors["vl53l0x_1"] = init_vl53l0x(tca, config.VL53_CHANNEL_2, "VL53L0X #2")
-    
-    # Step 4: Initialize accelerometer
-    sensors["adxl345"] = init_adxl345(tca)
-    
-    return sensors
-```
-
 **Why this order matters:**
 1. Must create I2C bus first (it's the communication highway)
 2. Must initialize multiplexer second (it controls access to channels)
@@ -164,7 +253,7 @@ def init_all_hardware():
 
 **How it works:**
 ```python
-# Conceptual flow:
+# Conceptual flow: FIXME: not how the new function works
 1. System is at unknown position
 2. Take 10 distance readings from sensor
 3. Average them to get baseline
@@ -192,49 +281,11 @@ Current reading: 150mm
 
 **Purpose**: Move motor to an **absolute** distance reading
 
-```python
-# Example call:
-move_station_distance(sensors, 'vl53l0x_0', 150, ser)
-
-# What happens:
-1. Current position: Read sensor → 100mm
-2. Target position: 150mm
-3. Calculate: Need to move +50mm
-4. Send motor command: "Move forward 50mm"
-5. Monitor sensor during movement
-6. Stop when sensor reads 150mm
-```
-
-**Closed-Loop Control:**
-```
-     ┌─────────────────────────────┐
-     │                             │
-     ▼                             │
-[Read Sensor] → [Calculate Error] → [Send Motor Command]
-                       │
-                       └─→ Error = Target - Current
-```
-
 ---
 
 ### 4. `move_station_distance_calibrated(sensors, calibration_data, sensor_name, relative_mm, ser)`
 
 **Purpose**: Move **relative to the calibrated baseline**
-
-```python
-# Example:
-# Baseline (from calibration): 100mm
-# Current position: 100mm (at home)
-# Command: Move +50mm relative
-
-move_station_distance_calibrated(sensors, calibration_data, 'vl53l0x_0', 50, ser)
-
-# What happens:
-1. Load baseline: 100mm
-2. Calculate target: 100mm + 50mm = 150mm
-3. Move to absolute position 150mm
-4. You're now 50mm extended from home
-```
 
 **Why two movement functions?**
 - `move_station_distance()` → "Go to 150mm" (absolute)
@@ -246,25 +297,11 @@ move_station_distance_calibrated(sensors, calibration_data, 'vl53l0x_0', 50, ser
 
 **Purpose**: Return to the fully retracted (home) position
 
-```python
-# Usually retracts to the smallest safe distance
-# Like a 3D printer returning print head to home corner
-
-move_to_retracted(sensors, 'vl53l0x_0', ser)
-# → Moves until sensor reads minimum safe distance
-```
-
 ---
 
 ### 6. `emergency_stop(ser)`
 
 **Purpose**: Immediately halt all motor movement
-
-```python
-emergency_stop(ser)
-# Sends stop command to motor controller
-# Critical for safety - must work instantly!
-```
 
 ---
 
@@ -272,19 +309,9 @@ emergency_stop(ser)
 
 **Purpose**: Read current value from a specific sensor
 
-```python
-# For distance sensor:
-distance = get_sensor_value(sensors, 'vl53l0x_0')
-print(distance)  # → 150 (mm)
-
-# For accelerometer:
-accel = get_sensor_value(sensors, 'adxl345')
-print(accel)  # → {'x': 0.1, 'y': 0.2, 'z': 9.8}
-```
-
 ---
 
-## 🔑 Key Concepts
+## Key Concepts
 
 ### 1. **I2C Communication**
 
@@ -363,9 +390,38 @@ ser.write(config.OFF)        # Stop command
 - `b'\x00'` → Stop
 - `b'\x03\x64'` → Move to position 100
 
+### 5. **Closed Loop Control Systems**
+**Closed-Loop Control:**
+
+
+```mermaid
+graph LR
+    A["Read Sensor"] --> B["Calculate Error<br/>────────────<br/>Error = Target - Current"]
+    B --> C["Send Motor<br/>Command"]
+    C --> |Feedback| A
+    
+    style A fill:#e1f5ff,stroke:#333,stroke-width:3px
+    style B fill:#fff4cc,stroke:#333,stroke-width:3px
+    style C fill:#ccffcc,stroke:#333,stroke-width:3px
+```
+
+**Closed-Loop Control System**
+
+**Feedback Control:**
+- Continuously monitors sensor readings
+- Compares current position to target position
+- Adjusts motor commands to minimize error
+
+**Control Loop Process:**
+1. **Read Sensor:** Get current position/state
+2. **Calculate Error:** Determine difference between target and current position
+3. **Send Motor Command:** Adjust motor based on calculated error
+4. **Repeat:** Loop continuously for closed-loop control
+
+
 ---
 
-## 💡 Usage Examples
+## Usage Examples
 
 ### Example 1: Basic Initialization and Reading
 
@@ -465,7 +521,7 @@ print(f"Offset from baseline: {reading['offset_mm']}mm")
 
 ---
 
-## 🎓 Common Patterns in the Code
+## Common Patterns in the Code
 
 ### Pattern 1: Try-Except-Finally for Hardware
 
@@ -516,7 +572,7 @@ while True:
 
 ---
 
-## 🚨 Safety Considerations
+## Safety Considerations
 
 ### 1. **Always Have an Emergency Stop**
 ```python
@@ -551,7 +607,7 @@ finally:
 
 ---
 
-## 🔧 Troubleshooting Guide
+## Troubleshooting Guide
 
 ### Problem: "I2C device not found"
 **Cause**: Wiring issue or wrong address
@@ -580,34 +636,4 @@ finally:
 - Run calibration: `calibrate_vl53_sensors(sensors)`
 - It will create calibration.json automatically
 
----
 
-## 📚 Summary
-
-This system is a **feedback-controlled positioning system**:
-
-1. **Sensors** tell you where you are (VL53L0X) and if you're moving (ADXL345)
-2. **Motor** moves the system to desired positions
-3. **Calibration** establishes a reference point (home position)
-4. **Control loop** continuously checks position and adjusts motor
-5. **Safety features** prevent damage (emergency stop, range limits)
-
-**Key Workflow:**
-```
-Initialize → Calibrate → Move → Monitor → Cleanup
-```
-
-**Think of it as:** A smart robotic positioner that knows where it is and can move to precise locations while monitoring for problems.
-
----
-
-## 🎯 Next Steps
-
-To understand the code better:
-1. Read through `main.py` following this guide
-2. Look at `hardware.py` to see how sensors are initialized
-3. Study `motor_control.py` to understand movement logic
-4. Check `calibration.py` to see how baseline is established
-5. Run the code with print statements to see data flow
-
-Good luck! 🚀
