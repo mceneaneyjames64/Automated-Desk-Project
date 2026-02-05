@@ -1,9 +1,0 @@
-homeassistant: true
-mqtt:
-  base_topic: zigbee2mqtt
-  server: 'mqtt://core-mosquitto:1883'
-  user: YOUR_MQTT_USERNAME
-  password: YOUR_MQTT_PASSWORD
-serial:
-  port: /dev/ttyUSB0  # replace with your Zigbee USB device path
-permit_join: true  # temporarily allow devices to join
