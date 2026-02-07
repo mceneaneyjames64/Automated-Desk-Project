@@ -1,14 +1,48 @@
 # Hardware Control System 
 
 ##  Table of Contents
-1. [System Overview](#system-overview)
-2. [Hardware Components](#hardware-components)
-3. [Code Flow](#code-flow)
-4. [Detailed Function Explanations](#detailed-function-explanations)
-5. [Key Concepts](#key-concepts)
-6. [Usage Examples](#usage-examples)
+1. [Directory Layout FIXME](#directory-layout)
+2. [System Overview](#system-overview)
+3. [Hardware Components](#hardware-components)
+4. [Code Flow](#code-flow)
+5. [Detailed Function Explanations](#detailed-function-explanations)
+6. [Key Concepts](#key-concepts)
+
 
 ---
+## Directory Layout FIXME
+```bash
+desk_controler/
+├── src/
+│   ├── __init__.py
+│   ├── main.py                      # Main application entry point
+│   ├── config.py                    # Configuration settings
+│   ├── calibration.py               # Calibration script  
+│   ├── motor_controller.py
+│   ├── hardware/
+│   │   ├── __init__.py
+│   │   ├── i2c_utils.py             # I2C bus management
+│   │   ├── sensors.py               # sensor setup
+│   │   └── serial_comm.py           # Serial communiction setup
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── misc.py                  # Miscalanious scripts
+│   │   ├── timeout.py 			     # Timeout logic
+│   │   └── heartbeat.py             # Heartbeat monitoring FIXME: DOES NOT EXIST YEY
+├── tests/
+│	├── test_hardware_system.py      # Unit tests for individual components
+│	├── test_integration.py          # Integration tests with simulated hardware
+│	├── pytest.ini                   # Pytest configuration
+│	├── test_requirements.txt        # Test dependencies
+│	├── run_tests.py                 # Test runner script
+│	└── README_TESTS.md              # Tests documentation
+├── docs/
+│   ├── Troubleshooting_guide.md
+│   ├── Calibration.md
+│   └── Examples.md
+├── requirements.txt                 # Python dependencies                      
+└── README.md                        # Project documentation
+```
 
 ## System Overview
 
@@ -142,52 +176,6 @@ FIXME: add angle measurement equation
 
 **Note**: Commands sent form the raspberry Pi to the control box toggle the function. If the box is given and 
 extend command the actuator will not stop unless the stop command is given or the actuator runs into it upper limit.
-
-## Directory Layout FIXME
-```
-project-name/
-├── src/
-│   ├── __init__.py
-│   ├── main.py                    # Main application entry point
-│   ├── config/
-│   │   ├── __init__.py
-│   │   ├── settings.py            # Configuration settings
-│   │   └── calibration.json       # Calibration data
-│   ├── hardware/
-│   │   ├── __init__.py
-│   │   ├── i2c_manager.py         # I2C bus management
-│   │   ├── multiplexer.py         # TCA9548A multiplexer
-│   │   ├── vl53l0x_sensor.py      # Distance sensors
-│   │   ├── adxl345_sensor.py      # Accelerometer
-│   │   └── motor_controller.py    # Serial motor control
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── calibration.py         # Calibration routines
-│   │   ├── position_controller.py # Position control logic
-│   │   └── heartbeat.py           # Heartbeat monitoring
-│   ├── communication/
-│   │   ├── __init__.py
-│   │   ├── server_client.py       # Server communication
-│   │   └── protocol.py            # Command protocol
-│   └── utils/
-│       ├── __init__.py
-│       ├── logger.py              # Logging utilities
-│       └── helpers.py             # Helper functions
-├── tests/
-│   ├── __init__.py
-│   ├── test_sensors.py
-│   ├── test_calibration.py
-│   └── test_motor_control.py
-├── docs/
-│   ├── hardware_setup.md
-│   ├── calibration_guide.md
-│   └── api_reference.md
-├── requirements.txt               # Python dependencies
-├── README.md                      # Project documentation
-├── .gitignore
-└── LICENSE
-```
-
 ## Code Flow
 
 ### Main Program Execution Flow
@@ -348,30 +336,8 @@ The MUX acts like a railroad switch:
 - Turn to Channel 0 → Talk to Sensor #1
 - Turn to Channel 1 → Talk to Sensor #2
 
-### 3. **Calibration Data Structure**
 
-```json
-{
-  "vl53l0x_0": {
-    "baseline_mm": 100.5,
-    "offset": 0,
-    "timestamp": 1638360000,
-    "samples": 10
-  },
-  "vl53l0x_1": {
-    "baseline_mm": 105.2,
-    "offset": 0,
-    "timestamp": 1638360000,
-    "samples": 10
-  }
-}
-```
 
-**Fields:**
-- `baseline_mm`: The "home" position distance
-- `offset`: Additional correction factor
-- `timestamp`: When calibration was done
-- `samples`: How many readings were averaged
 
 ### 4. **Serial Communication**
 
@@ -420,156 +386,6 @@ graph LR
 
 
 ---
-
-## Usage Examples
-
-### Example 1: Basic Initialization and Reading
-
-```python
-# Initialize everything
-sensors = init_all_hardware()
-ser = init_serial()
-
-# Read a distance sensor
-distance = get_sensor_value(sensors, 'vl53l0x_0')
-print(f"Current distance: {distance}mm")
-
-# Read accelerometer
-accel = get_sensor_value(sensors, 'adxl345')
-print(f"Acceleration: X={accel['x']}, Y={accel['y']}, Z={accel['z']}")
-```
-
-### Example 2: Calibration Workflow
-
-```python
-# Try to load existing calibration
-calibration_data = load_calibration()
-
-if calibration_data is None:
-    # No calibration found - create new one
-    print("Running calibration...")
-    calibration_data = calibrate_vl53_sensors(sensors)
-    print("Calibration complete!")
-else:
-    print("Loaded existing calibration")
-
-# Show calibration info
-print_calibration_info(calibration_data)
-```
-
-### Example 3: Controlled Movement
-
-```python
-# Move to absolute position
-move_station_distance(sensors, 'vl53l0x_0', 150, ser)
-# → Motor moves until sensor reads 150mm
-
-# Move relative to home
-move_station_distance_calibrated(sensors, calibration_data, 'vl53l0x_0', 50, ser)
-# → Extends 50mm from calibrated baseline
-
-# Return home
-move_to_retracted(sensors, 'vl53l0x_0', ser)
-# → Retracts to minimum safe position
-
-# Emergency stop
-emergency_stop(ser)
-# → Immediate halt
-```
-
-### Example 4: Continuous Monitoring
-
-```python
-import time
-
-while True:
-    # Read both distance sensors
-    dist1 = get_sensor_value(sensors, 'vl53l0x_0')
-    dist2 = get_sensor_value(sensors, 'vl53l0x_1')
-    
-    # Read accelerometer
-    accel = get_sensor_value(sensors, 'adxl345')
-    
-    # Print status
-    print(f"Sensor 1: {dist1}mm | Sensor 2: {dist2}mm")
-    print(f"Accel: X={accel['x']:.2f}g Y={accel['y']:.2f}g Z={accel['z']:.2f}g")
-    
-    # Check for problems
-    if abs(dist1 - dist2) > 10:
-        print("WARNING: Sensors disagree!")
-        emergency_stop(ser)
-    
-    time.sleep(1)  # Wait 1 second
-```
-
-### Example 5: With Calibrated Readings
-
-```python
-# Get raw and calibrated readings
-reading = get_calibrated_reading(sensors, 'vl53l0x_0', calibration_data)
-
-print(f"Raw reading: {reading['raw_mm']}mm")
-print(f"Baseline: {reading['baseline_mm']}mm")
-print(f"Offset from baseline: {reading['offset_mm']}mm")
-
-# Example output:
-# Raw reading: 150mm
-# Baseline: 100mm
-# Offset from baseline: 50mm
-# → You're 50mm extended from home position
-```
-
----
-
-## Common Patterns in the Code
-
-### Pattern 1: Try-Except-Finally for Hardware
-
-```python
-try:
-    # Initialize hardware
-    sensors = init_all_hardware()
-    ser = init_serial()
-    
-    # Do work...
-    
-except Exception as e:
-    print(f"Error: {e}")
-    return 1
-    
-finally:
-    # Always turn off motor (safety!)
-    ser.write(config.OFF)
-```
-
-**Why**: Hardware can fail unpredictably. Always clean up!
-
-### Pattern 2: Sensor Reading with Error Handling
-
-```python
-try:
-    value = get_sensor_value(sensors, 'vl53l0x_0')
-except Exception:
-    # Sensor failed - use safe default or stop
-    emergency_stop(ser)
-    raise
-```
-
-### Pattern 3: Closed-Loop Control
-
-```python
-while True:
-    current = get_sensor_value(sensors, 'vl53l0x_0')
-    error = target - current
-    
-    if abs(error) < tolerance:
-        break  # Close enough!
-    
-    # Send movement command proportional to error
-    move_command = calculate_command(error)
-    ser.write(move_command)
-```
-
 ---
 
 ## Safety Considerations
@@ -604,36 +420,3 @@ finally:
     # Always execute, even if error
     ser.write(config.OFF)
 ```
-
----
-
-## Troubleshooting Guide
-
-### Problem: "I2C device not found"
-**Cause**: Wiring issue or wrong address
-**Fix**: 
-- Check SDA/SCL connections
-- Run `i2cdetect -y 1` (on Raspberry Pi)
-- Verify device address in config
-
-### Problem: "Sensors give wildly different readings"
-**Cause**: One sensor is faulty or misaligned
-**Fix**:
-- Check sensor #2 isn't reading a different object
-- Recalibrate both sensors
-- Replace faulty sensor
-
-### Problem: "Motor moves but doesn't stop at target"
-**Cause**: Closed-loop control not working
-**Fix**:
-- Verify sensor updates during movement
-- Check serial communication
-- Add debug prints to see current position
-
-### Problem: "Calibration file not found"
-**Cause**: First run, no calibration saved
-**Fix**: 
-- Run calibration: `calibrate_vl53_sensors(sensors)`
-- It will create calibration.json automatically
-
-
