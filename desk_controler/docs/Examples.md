@@ -95,3 +95,53 @@ print(f"Offset from baseline: {reading['offset_mm']}mm")
 # Offset from baseline: 50mm
 # → You're 50mm extended from home position
 ```
+---
+
+## Common Patterns in the Code
+
+### Pattern 1: Try-Except-Finally for Hardware
+
+```python
+try:
+    # Initialize hardware
+    sensors = init_all_hardware()
+    ser = init_serial()
+    
+    # Do work...
+    
+except Exception as e:
+    print(f"Error: {e}")
+    return 1
+    
+finally:
+    # Always turn off motor (safety!)
+    ser.write(config.OFF)
+```
+
+**Why**: Hardware can fail unpredictably. Always clean up!
+
+### Pattern 2: Sensor Reading with Error Handling
+
+```python
+try:
+    value = get_sensor_value(sensors, 'vl53l0x_0')
+except Exception:
+    # Sensor failed - use safe default or stop
+    emergency_stop(ser)
+    raise
+```
+
+### Pattern 3: Closed-Loop Control
+
+```python
+while True:
+    current = get_sensor_value(sensors, 'vl53l0x_0')
+    error = target - current
+    
+    if abs(error) < tolerance:
+        break  # Close enough!
+    
+    # Send movement command proportional to error
+    move_command = calculate_command(error)
+    ser.write(move_command)
+```
