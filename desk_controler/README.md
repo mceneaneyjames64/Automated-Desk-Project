@@ -7,6 +7,7 @@
 4. [Code Flow](#code-flow)
 5. [Detailed Function Explanations](#detailed-function-explanations)
 6. [Key Concepts](#key-concepts)
+7. [Related Documentation FIXME](#related-documentation)
 
 
 ---
@@ -130,7 +131,6 @@ graph TD
 - **Accuracy**: ±3% 
 - **How it works**: Sends laser pulse, measures time for reflection
 - **Use case**: Used as the feedback method for the monitor and keyboard height linear actuators
-- **Docs**: Documentation can be found on the Adafruit website [here](#https://learn.adafruit.com/adafruit-vl53l0x-micro-lidar-distance-sensor-breakout).
 
 ```mermaid 
 graph LR 
@@ -146,8 +146,7 @@ style B fill:#ffe1e1
 - **Output**: Acceleration in g's (gravity units)
   - Stationary: (0, 0, 9.8) = gravity pulling down
   - Moving: Changes in X, Y, Z values
-  - **Docs**: Documentation can be found on the Adafruit website [here](#https://www.adafruit.com/product/1231?gad_source=1&gad_campaignid=21079267614&gclid=Cj0KCQiAnJHMBhDAARIsABr7b86xpB53FGgP611S-nHp8bbQ6ZLXaWfghXusS2Xnw88LeZu_aI-UZJYaArQ8EALw_wcB).
-  - 
+
 ```mermaid
 graph TD
     A[Accelerometer<br/>IMU Sensor] --> X[X-Axis<br/>Left/Right]
@@ -330,3 +329,15 @@ finally:
     # Always execute, even if error
     ser.write(config.OFF)
 ```
+## Related Documentation FIXME
+
+-   Testing Guide - Comprehensive testing documentation
+-   [Adafruit CircuitPython](https://docs.circuitpython.org/) - Library documentation
+-   [VL53L0X Datasheet](https://www.st.com/resource/en/datasheet/vl53l0x.pdf)
+-   [ADXL345 Datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf)
+- [I2C Documentation](
+
+
+
+
+
