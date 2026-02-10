@@ -2,16 +2,16 @@
 
 Get your desk controller up and running in 15 minutes.
 
-## 🎯 What You'll Need
+## What You'll Need:
 
 ### Hardware
-- ✅ Raspberry Pi (3/4/5 or Zero 2 W)
-- ✅ TCA9548A I2C Multiplexer
-- ✅ 2x VL53L0X Time-of-Flight Distance Sensors
-- ✅ 1x ADXL345 Accelerometer
-- ✅ Serial motor controller
-- ✅ Jumper wires
-- ✅ Power supply (5V for Pi, check motor controller requirements)
+- Raspberry Pi (3/4/5 or Zero 2 W)
+- TCA9548A I2C Multiplexer
+- 2x VL53L0X Time-of-Flight Distance Sensors
+- 1x ADXL345 Accelerometer
+- Serial motor controller
+- Jumper wires
+- Power supply (5V for Pi, check motor controller requirements)
 
 ### Software
 - Raspberry Pi OS (Raspbian)
@@ -20,7 +20,7 @@ Get your desk controller up and running in 15 minutes.
 
 ---
 
-## 📦 Step 1: Hardware Setup (5 minutes)
+## Step 1: Hardware Setup (5 minutes)
 
 ### Wiring Connections
 
@@ -76,7 +76,7 @@ Pin 6 (GND)       ──→ GND
 
 ---
 
-## ⚙️ Step 2: Raspberry Pi Setup (3 minutes)
+## Step 2: Raspberry Pi Setup (3 minutes)
 
 ### Enable I2C
 ```bash
@@ -117,7 +117,7 @@ i2cdetect -y 1
 
 ---
 
-## 💻 Step 3: Software Installation (5 minutes)
+## Step 3: Software Installation (5 minutes)
 
 ### Clone and Install
 ```bash
@@ -144,7 +144,7 @@ pip3 list | grep -E 'adafruit|pyserial'
 
 ---
 
-## 🚀 Step 4: First Run (2 minutes)
+## Step 4: First Run (2 minutes)
 
 ### Test Hardware Detection
 ```bash
@@ -181,7 +181,7 @@ python3 main.py
 
 ---
 
-## 📏 Step 5: Initial Calibration (3 minutes)
+## Step 5: Initial Calibration (3 minutes)
 
 The first time you run the system, you'll need to calibrate the sensors.
 
@@ -209,7 +209,7 @@ sensors = {
 
 # Calibrate
 calibration_data = calibrate_vl53_sensors(sensors)
-print('✅ Calibration complete!')
+print('Calibration complete!')
 "
 ```
 
@@ -237,7 +237,7 @@ cat vl53_calibration.json
 
 ---
 
-## ✅ Step 6: Basic Operation Test
+## Step 6: Basic Operation Test
 
 ### Test Sensor Readings
 ```bash
@@ -288,13 +288,13 @@ move_station_distance(sensors, 'vl53l0x_0', 70, ser, timeout=10)
 
 # Stop
 emergency_stop(ser)
-print('✅ Test complete!')
+print('Test complete!')
 "
 ```
 
 ---
 
-## 🎉 You're Ready!
+## You're Ready!
 
 Your desk controller is now set up and calibrated. Here are some next steps:
 
@@ -356,7 +356,7 @@ cat vl53_calibration.json
 
 ---
 
-## 🐛 Common Issues & Solutions
+## Common Issues & Solutions
 
 ### Issue: I2C Not Detected
 **Solution:**
@@ -407,7 +407,7 @@ pip3 install adafruit-blinka adafruit-circuitpython-vl53l0x
 
 ---
 
-## 📚 Next Steps
+## Next Steps
 
 Once you're up and running, explore these resources:
 
@@ -434,7 +434,7 @@ I2C_RETRIES = 5       # More retries for reliability
 
 ---
 
-## 🆘 Getting Help
+## Getting Help
 
 If you encounter issues:
 
@@ -446,7 +446,7 @@ If you encounter issues:
 
 ---
 
-## ✨ Quick Reference Card
+## Quick Reference Card
 
 | Action | Command |
 |--------|---------|
