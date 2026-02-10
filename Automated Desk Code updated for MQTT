@@ -31,65 +31,51 @@ CMD_emergency_stop =0x14
 # One-shot (tap) functions.
 async def monitor_up():
     print("One-shot: Monitor Up")
-    #await desk_controller.one_off_command(CMD_monitor_up)
 
 async def monitor_down():
     print("One-shot: Monitor Down")
-    #await desk_controller.one_off_command(CMD_monitor_down)
 
 async def keyboard_up():
     print("One-shot: Keyboard Up")
-    #await desk_controller.one_off_command(CMD_keyboard_up)
 
 async def keyboard_down():
     print("One-shot: Keyboard Down")
-    #await desk_controller.one_off_command(CMD_keyboard_down)
 
 async def monitor_tilt_up():
     print("One-shot: Monitor Tilt Up")
-    #await desk_controller.one_off_command(CMD_monitor_tilt_up)
 
 async def monitor_tilt_down():
     print("One-shot: Monitor Tilt Down")
-    #await desk_controller.one_off_command(CMD_monitor_tilt_down)
 
 async def preset_one():
     print("Preset One...")
-    #await desk_controller.one_off_command(CMD_preset_one)
 
 async def preset_two():
     print("Preset Two...")
-    #await desk_controller.one_off_command(CMD_preset_two)
 
 async def preset_three():
     print("Preset Three...")
-    #await desk_controller.one_off_command(CMD_preset_three)
 
 async def set_preset_one():
     print("Set Preset One...")
-    #await desk_controller.one_off_command(CMD_set_preset_one)
 
 async def set_preset_two():
     print("Set Preset Two...")
-    #await desk_controller.one_off_command(CMD_set_preset_two)
 
 async def set_preset_three():
     print("Set Preset Three...")
-    #await desk_controller.one_off_command(CMD_set_preset_three)
 
 async def calibrate():
     print("Calibrate...")
-    #await desk_controller.one_off_command(CMD_calibrate)
 
 async def emergency_stop():
     print("Emergency Stop...")
-    #await desk_controller.one_off_command(CMD_emergency_stop)
-    
+
+#Run regular movement with delay for continuous command
 async def continuous_command(command_key: int):
         #up/down button on remote function
         try:
             while True:
-                #await write_command(command_key)
                 await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             print(f"Continuous command {command_key} cancelled.")
@@ -135,13 +121,14 @@ CONTINUOUS_COMMANDS = {
 }
 
 # Dictionary to track active continuous tasks.
-# For each command (e.g. "head_up"), we store a dict with keys: 'task' and 'last_update'
+# For each command (e.g. "monitor_up"), we store a dict with keys: 'task' and 'last_update'
 continuous_tasks = {}
 
 # Timeout: if no repeated message arrives within this many seconds, cancel the continuous command.
 CONTINUOUS_TIMEOUT = 0.3
 
 async def mqtt_command_handler():
+#Deal with MQTT messages to pass directly from home Assitnt to Raspberry Pi
     async with Client(MQTT_BROKER, port=MQTT_PORT, username=MQTT_USERNAME, password=MQTT_PASSWORD) as client:
         await client.subscribe(MQTT_TOPIC)
         print(f"Subscribed to MQTT topic: {MQTT_TOPIC}")
@@ -150,7 +137,7 @@ async def mqtt_command_handler():
             print(f"Received MQTT message: {payload}")
 
             if payload.startswith("start_"):
-                cmd = payload[6:]  # e.g. "head_up"
+                cmd = payload[6:]  # e.g. "monitor_up"
                 if cmd in CONTINUOUS_COMMANDS:
                     now = asyncio.get_event_loop().time()
                     if cmd in continuous_tasks:
@@ -164,11 +151,13 @@ async def mqtt_command_handler():
                 else:
                     print(f"Unknown continuous command: {cmd}")
 
+            #move once, not continuously
             elif payload in ONE_SHOT_COMMANDS:
                 asyncio.create_task(ONE_SHOT_COMMANDS[payload]())
             else:
                 print(f"Unknown command received: {payload}")
 
+#code to cancel continuous command and for timeouts
 async def continuous_task_monitor():
     while True:
         now = asyncio.get_event_loop().time()
