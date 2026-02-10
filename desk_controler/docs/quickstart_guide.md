@@ -239,7 +239,7 @@ Look for:
 
 ```
 ---
-
+```
 ## Step 4: First Run (2 minutes)
 
 ### Test Hardware Detection
