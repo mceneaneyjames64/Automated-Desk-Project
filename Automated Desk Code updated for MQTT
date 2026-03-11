@@ -136,6 +136,7 @@ async def mqtt_command_handler():
             payload = message.payload.decode().strip()
             print(f"Received MQTT message: {payload}")
 
+            #determine whether to run continuous or one shot commands
             if payload.startswith("start_"):
                 cmd = payload[6:]  # e.g. "monitor_up"
                 if cmd in CONTINUOUS_COMMANDS:

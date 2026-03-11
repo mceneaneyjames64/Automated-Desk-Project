@@ -2,16 +2,16 @@
 
 Get your desk controller up and running in 15 minutes.
 
-## 🎯 What You'll Need
+## What You'll Need:
 
 ### Hardware
-- ✅ Raspberry Pi (3/4/5 or Zero 2 W)
-- ✅ TCA9548A I2C Multiplexer
-- ✅ 2x VL53L0X Time-of-Flight Distance Sensors
-- ✅ 1x ADXL345 Accelerometer
-- ✅ Serial motor controller
-- ✅ Jumper wires
-- ✅ Power supply (5V for Pi, check motor controller requirements)
+- Raspberry Pi (3/4/5 or Zero 2 W)
+- TCA9548A I2C Multiplexer
+- 2x VL53L0X Time-of-Flight Distance Sensors
+- 1x ADXL345 Accelerometer
+- Serial motor controller
+- Jumper wires
+- Power supply (5V for Pi, check motor controller requirements)
 
 ### Software
 - Raspberry Pi OS (Raspbian)
@@ -20,7 +20,7 @@ Get your desk controller up and running in 15 minutes.
 
 ---
 
-## 📦 Step 1: Hardware Setup (5 minutes)
+## Step 1: Hardware Setup (5 minutes)
 
 ### Wiring Connections
 
@@ -76,7 +76,7 @@ Pin 6 (GND)       ──→ GND
 
 ---
 
-## ⚙️ Step 2: Raspberry Pi Setup (3 minutes)
+## Step 2: Raspberry Pi Setup (3 minutes)
 
 ### Enable I2C
 ```bash
@@ -117,7 +117,7 @@ i2cdetect -y 1
 
 ---
 
-## 💻 Step 3: Software Installation (5 minutes)
+## Step 3: Software Installation (5 minutes)
 
 ### Clone and Install
 ```bash
@@ -130,7 +130,6 @@ cd desk_controler
 
 # Install Python dependencies
 pip3 install -r requirements.txt
-```
 
 ### Verify Installation
 ```bash
@@ -140,11 +139,108 @@ python3 --version
 
 # Verify dependencies installed
 pip3 list | grep -E 'adafruit|pyserial'
+
+
+ ```
+
+## Step 3: Software Installation (5 minutes) ---> Step by Step
+
+This step installs the project and its required Python packages in a safe, isolated environment.
+
+## 1. Open a Terminal
+
+ macOS: Applications → Utilities → Terminal
+
+ Linux: Open your terminal app
+
+ Windows: Open PowerShell (recommended)
+
+## 2. Go to Your Home Directory
+
+ This is a safe place to keep projects.
+
+ cd ~
+
+## 3. Clone the Project Repository
+
+ Replace <repository-url> with the actual repository URL.
+
+ git clone <repository-url> desk_controller
+ cd desk_controller
+
+
+## If git is not installed, install it first:
+
+ macOS: brew install git
+
+ Ubuntu/Debian: sudo apt install git
+
+ Windows: https://git-scm.com/downloads
+
+## 4. Check Your Python Version
+ python3 --version
+
+
+ You should see Python 3.7 or higher.
+
+ If that fails:
+
+ Try python --version
+
+ On Windows, make sure Python is installed from https://python.org
+  and “Add Python to PATH” was checked during install.
+
+## 5. Create a Virtual Environment (Strongly Recommended)
+
+ This keeps project dependencies from affecting your system.
+
+ python3 -m venv venv
+
+ Activate it:
+
+ macOS / Linux
+
+ source venv/bin/activate
+
+
+ Windows (PowerShell)
+
+ venv\Scripts\Activate.ps1
+
+
+ You should now see (venv) at the start of your terminal line.
+
+## 6. Install Required Python Packages
+ pip install --upgrade pip
+ pip install -r requirements.txt
+
+
+ Wait for the installation to finish (this may take a minute).
+
+## 7. Verify the Installation
+ Confirm key dependencies are installed:
+ pip list
+
+
+Look for:
+
+ pyserial
+
+ adafruit (or Adafruit-related packages)
+
+ Optional automatic check (works on all systems):
+ python - <<EOF
+ import pkg_resources
+ packages = ["pyserial", "adafruit"]
+ for p in packages:
+     found = any(p in d.project_name.lower() for d in pkg_resources.working_set)
+     print(f"{p}: {'OK' if found else 'MISSING'}")
+ EOF
+
 ```
-
 ---
-
-## 🚀 Step 4: First Run (2 minutes)
+```
+## Step 4: First Run (2 minutes)
 
 ### Test Hardware Detection
 ```bash
@@ -181,7 +277,7 @@ python3 main.py
 
 ---
 
-## 📏 Step 5: Initial Calibration (3 minutes)
+## Step 5: Initial Calibration (3 minutes)
 
 The first time you run the system, you'll need to calibrate the sensors.
 
@@ -209,7 +305,7 @@ sensors = {
 
 # Calibrate
 calibration_data = calibrate_vl53_sensors(sensors)
-print('✅ Calibration complete!')
+print('Calibration complete!')
 "
 ```
 
@@ -237,7 +333,7 @@ cat vl53_calibration.json
 
 ---
 
-## ✅ Step 6: Basic Operation Test
+## Step 6: Basic Operation Test
 
 ### Test Sensor Readings
 ```bash
@@ -288,13 +384,13 @@ move_station_distance(sensors, 'vl53l0x_0', 70, ser, timeout=10)
 
 # Stop
 emergency_stop(ser)
-print('✅ Test complete!')
+print('Test complete!')
 "
 ```
 
 ---
 
-## 🎉 You're Ready!
+## You're Ready!
 
 Your desk controller is now set up and calibrated. Here are some next steps:
 
@@ -356,7 +452,7 @@ cat vl53_calibration.json
 
 ---
 
-## 🐛 Common Issues & Solutions
+## Common Issues & Solutions
 
 ### Issue: I2C Not Detected
 **Solution:**
@@ -407,7 +503,7 @@ pip3 install adafruit-blinka adafruit-circuitpython-vl53l0x
 
 ---
 
-## 📚 Next Steps
+## Next Steps
 
 Once you're up and running, explore these resources:
 
@@ -434,7 +530,7 @@ I2C_RETRIES = 5       # More retries for reliability
 
 ---
 
-## 🆘 Getting Help
+## Getting Help
 
 If you encounter issues:
 
@@ -446,7 +542,7 @@ If you encounter issues:
 
 ---
 
-## ✨ Quick Reference Card
+## Quick Reference Card
 
 | Action | Command |
 |--------|---------|
