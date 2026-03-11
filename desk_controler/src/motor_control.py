@@ -71,7 +71,7 @@ def move_station_distance(sensors, name, target_distance, ser=None, tolerance=2,
 
 
 def move_station_distance_calibrated(sensors, calibration_data, name, 
-                                     target_offset, ser=None, tolerance=2, timeout=30):
+                                     target_offset, ser=None, tolerance=3, timeout=30):
     """
     Move actuator to specific offset from calibrated baseline
     

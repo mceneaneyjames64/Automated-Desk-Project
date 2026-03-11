@@ -33,8 +33,8 @@ def calibrate_vl53_sensors(sensors):
     
     calibration_data = {}
     
-    # Calibrate VL53L0X #1
-    print(f"\nCalibrating VL53L0X #1 (taking {CALIBRATION_SAMPLES} samples)...")
+    # Calibrate VL53L0X #0
+    print(f"\nCalibrating VL53L0X #0 (taking {CALIBRATION_SAMPLES} samples)...")
     vl53_0_readings = []
     for i in range(CALIBRATION_SAMPLES):
         reading = get_sensor_value(sensors, 'vl53l0x_0')
@@ -45,17 +45,17 @@ def calibrate_vl53_sensors(sensors):
     vl53_0_baseline = sum(vl53_0_readings) / len(vl53_0_readings)
     print(f"  Average baseline: {vl53_0_baseline:.2f} mm")
     
-    # Calibrate VL53L0X #2
-    print(f"\nCalibrating VL53L0X #2 (taking {CALIBRATION_SAMPLES} samples)...")
-    vl53_1_readings = []
-    for i in range(CALIBRATION_SAMPLES):
-        reading = get_sensor_value(sensors, 'vl53l0x_1')
-        vl53_1_readings.append(reading)
-        print(f"  Sample {i+1}/{CALIBRATION_SAMPLES}: {reading} mm")
-        time.sleep(SAMPLE_DELAY)
+    # Calibrate VL53L0X #1
+#    print(f"\nCalibrating VL53L0X #1 (taking {CALIBRATION_SAMPLES} samples)...")
+#    vl53_1_readings = []
+#    for i in range(CALIBRATION_SAMPLES):
+#       reading = get_sensor_value(sensors, 'vl53l0x_1')
+#       vl53_1_readings.append(reading)
+#       print(f"  Sample {i+1}/{CALIBRATION_SAMPLES}: {reading} mm")
+#       time.sleep(SAMPLE_DELAY)
     
-    vl53_1_baseline = sum(vl53_1_readings) / len(vl53_1_readings)
-    print(f"  Average baseline: {vl53_1_baseline:.2f} mm")
+#    vl53_1_baseline = sum(vl53_1_readings) / len(vl53_1_readings)
+#    print(f"  Average baseline: {vl53_1_baseline:.2f} mm")
     
     # Store calibration data
     calibration_data = {
@@ -65,8 +65,8 @@ def calibrate_vl53_sensors(sensors):
             'timestamp': time.time()
         },
         'vl53l0x_1': {
-            'baseline_mm': vl53_1_baseline,
-            'samples': vl53_1_readings,
+            'baseline_mm': 20, #vl53_1_baseline,
+            'samples': 10, #vl53_1_readings,
             'timestamp': time.time()
         }
     }
@@ -77,8 +77,8 @@ def calibrate_vl53_sensors(sensors):
     print("\n" + "="*50)
     print("CALIBRATION COMPLETE")
     print("="*50)
-    print(f"VL53L0X #1 baseline: {vl53_0_baseline:.2f} mm")
-    print(f"VL53L0X #2 baseline: {vl53_1_baseline:.2f} mm")
+    print(f"VL53L0X #0 baseline: {vl53_0_baseline:.2f} mm")
+ #   print(f"VL53L0X #1 baseline: {vl53_1_baseline:.2f} mm")
     print(f"Data saved to: {CALIBRATION_FILE}\n")
     
     return calibration_data

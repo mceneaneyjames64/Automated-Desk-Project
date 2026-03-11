@@ -45,6 +45,8 @@ def init_vl53l0x(tca, channel, name):
     def _init():
         sensor = adafruit_vl53l0x.VL53L0X(tca[channel])
         sensor.measurement_timing_budget = config.VL53_TIMING_BUDGET
+        sensor.signal_rate_limit = config.VL53_RATE_LIMIT
+        sensor.sigma_limit = config.VL53_SIGMA_LIMIT
         read_with_timeout(lambda: sensor.range, f"{name} range validation")
         return sensor
         

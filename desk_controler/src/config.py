@@ -5,8 +5,26 @@ OPERATION_TIMEOUT = 5
 READ_TIMEOUT = 1.0
 
 # VL53L0X Configuration
-VL53_TIMING_BUDGET = 100000
+
+# Measurment timing budget (microseconds)
+# Higher = more accurate
+VL53_TIMING_BUDGET = 200000
+
+# Signal rate limit (affects valid measurment threshold) (MCPS)
+# Lower = more permissive (detects weak returns)
+# Higher = stricted (better accuracy on clean targets)
+# Range: 0.1 - 0.5
+# For accuracy in solid targets, use 0.25 - 0.5
+VL53_RATE_LIMIT = 0.25
+
+# Enable sigma (noise) estimation limit (millimeters)
+# Lower vlaue = only accept low-noise readings
+VL53_SIGMA_LIMIT = 9
+
+# I2C adress
 VL53_ADDRESS = 0x29
+
+# MUX channels
 VL53_CHANNEL_1 = 0
 VL53_CHANNEL_2 = 1
 
