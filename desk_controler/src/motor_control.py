@@ -40,6 +40,14 @@ def move_station_distance(sensors, name, target_distance, ser=None, tolerance=2,
     
     print(f"Moving {name} to {target_distance}mm (tolerance: ±{tolerance}mm)")
     
+    # Enforce limits
+    if target_distance < config.MIN_POSITION:
+        print(f"Warning: Position {target_distance} below MIN_POSITION ({config.MIN_POSITION}), clamping")
+        target_distance = config.MIN_POSITION
+    elif target_distance > config.MAX_POSITION:
+        print(f"Warning: Position {target_distance} above MAX_POSITION ({config.MAX_POSITION}), clamping")
+        target_distance = config.MAX_POSITION
+    
     start_time = time.monotonic()
     
     while True:
@@ -66,38 +74,7 @@ def move_station_distance(sensors, name, target_distance, ser=None, tolerance=2,
         elif error < -tolerance:
             # Current distance < target, need to extend (move OUT)
             ser.write(motor_out)
-        
-        time.sleep(0.05)  # Small delay to avoid overwhelming the sensor
-
-
-def move_station_distance_calibrated(sensors, calibration_data, name, 
-                                     target_offset, ser=None, tolerance=3, timeout=30):
-    """
-    Move actuator to specific offset from calibrated baseline
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        calibration_data (dict): Calibration data with baselines
-        name (str): Sensor name ('vl53l0x_0' or 'vl53l0x_1')
-        target_offset (int): Target offset from baseline in mm (positive = extended)
-        ser: Serial port object for motor control (optional keyword argument)
-        tolerance (int): Acceptable distance tolerance in mm
-        timeout (float): Maximum time to attempt movement in seconds
-        
-    Returns:
-        bool: True if target reached, False if timeout
-    """
-    if calibration_data is None or name not in calibration_data:
-        raise RuntimeError(f"No calibration data for {name}")
-    
-    baseline = calibration_data[name]['baseline_mm']
-    target_distance = baseline + target_offset
-    
-    print(f"Moving {name} to offset {target_offset}mm (absolute: {target_distance}mm)")
-    
-    return move_station_distance(sensors, name, target_distance, ser, tolerance, timeout)
-
-
+       
 def move_to_retracted(sensors, name, ser=None, timeout=30):
     """
     Move actuator to fully retracted position (MIN_POSITION)
@@ -136,32 +113,6 @@ def move_to_retracted(sensors, name, ser=None, timeout=30):
     ser.write(config.OFF)
     print(f"Timeout while retracting {name}")
     return False
-
-
-def move_to_position_limits(sensors, name, position, ser=None, timeout=30):
-    """
-    Move actuator with safety limits enforced
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        name (str): Sensor name
-        position (int): Target position in mm
-        ser: Serial port object (optional keyword argument)
-        timeout (float): Maximum time in seconds
-        
-    Returns:
-        bool: True if target reached
-    """
-    # Enforce limits
-    if position < config.MIN_POSITION:
-        print(f"Warning: Position {position} below MIN_POSITION ({config.MIN_POSITION}), clamping")
-        position = config.MIN_POSITION
-    elif position > config.MAX_POSITION:
-        print(f"Warning: Position {position} above MAX_POSITION ({config.MAX_POSITION}), clamping")
-        position = config.MAX_POSITION
-    
-    return move_station_distance(sensors, name, position, ser, timeout=timeout)
-
 
 def emergency_stop(ser):
     """Send emergency stop command to all motors"""

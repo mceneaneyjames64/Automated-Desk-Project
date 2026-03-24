@@ -11,7 +11,6 @@ from hardware import (
 	
 from motor_control import (
 	move_station_distance,
-	move_station_distance_calibrated,
 	move_to_retracted,
 	emergency_stop
 	)
@@ -64,10 +63,9 @@ def init_all_hardware():
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 
-def run_test(sensors, ser, baseline, cycle_number, writer, csv_file, calibration_data):
+def run_test(sensors, ser, cycle_number, writer, csv_file):
     print(f"\n{'─'*60}")
     print(f"  Cycle {cycle_number}  —  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"  Baseline: {baseline:.1f} mm")
     print(f"{'─'*60}")
     
     print(f"cont mode: {sensors["vl53l0x_0"].is_continuous_mode}")
@@ -77,7 +75,7 @@ def run_test(sensors, ser, baseline, cycle_number, writer, csv_file, calibration
     for label, offset in SEQUENCE:
 
         print(f"\n  → Moving: {label}  (target: {offset:.1f} mm)")
-        move_station_distance_calibrated(sensors, calibration_data, "vl53l0x_0", offset, ser)
+        move_station_distance(sensors, "vl53l0x_0", offset, ser)
 
         sensor_reading = sensors["vl53l0x_0"].range
 
@@ -135,8 +133,7 @@ def main():
 
 		# Calibrate TOF sensors
 		#calibrate_vl53_sensors(sensors)
-		calibration_data = calibrate_vl53_sensors(sensors)
-		baseline = calibration_data["vl53l0x_0"]["baseline_mm"]
+		calibrate_vl53_sensors(sensors)
 		
 		
   
@@ -158,7 +155,7 @@ def main():
 		cycle = 1
     
 		while True:
-			run_test(sensors, ser, baseline, cycle, writer, csv_file, calibration_data)
+			run_test(sensors, ser, cycle, writer, csv_file)
 			cycle += 1
 			input("\n  Press Enter to start next cycle, or Ctrl-C to stop...")
 
