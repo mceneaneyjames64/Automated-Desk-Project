@@ -1,0 +1,30 @@
+from datetime import datetime, timedelta
+import time
+import traceback
+
+
+def sensor_read_test():
+	try:
+		s = datetime.now()
+		while True:
+			# Read sensors once per iteration
+			print(get_sensor_value(sensors, 'vl53l0x_0'))
+			print(get_sensor_value(sensors, 'vl53l0x_1'))
+			print(get_sensor_value(sensors, 'adxl345'))
+        
+			e = datetime.now()
+			elapsed = (e - s).total_seconds()
+			td = timedelta(seconds=elapsed)
+			print(f"\nElapsed time: {td}")
+        
+			time.sleep(10)
+        
+	except Exception as e:
+		print(f"\nSensor read failed: {e}")
+		traceback.print_exc()
+		        
+	finally:
+		print(f"Test ended at time: {datetime.now()}")
+
+	return 0
+	

@@ -1,162 +1,154 @@
 """
-Calibration routine for VL53L0X sensors at fully retracted position
+Calibration routine for VL53L0X sensors using software offset correction.
+
+The VL53L0X Adafruit library does not support writing to the hardware offset
+register at runtime. Instead, this module measures the sensor error against a
+known reference distance and saves a software offset that is applied to every
+reading via get_calibrated_reading().
 """
 import time
-import json
-from pathlib import Path
+import config
+import pprint
 from hardware import get_sensor_value
 
-
-CALIBRATION_FILE = "vl53_calibration.json"
 CALIBRATION_SAMPLES = 10
 SAMPLE_DELAY = 0.1
 
+# Place a flat target exactly this far from each sensor before calibrating.
+KNOWN_DISTANCE_MM = 0
+
+calibration_data = {}
+
+def _read_raw_average(sensors, sensor_key, num_samples=CALIBRATION_SAMPLES):
+	"""Take multiple readings and return (average, list_of_samples)."""
+	readings = []
+	for i in range(num_samples):
+		reading = get_sensor_value(sensors, sensor_key)
+		readings.append(reading)
+		print(f"  Sample {i + 1}/{num_samples}: {reading} mm")
+		time.sleep(SAMPLE_DELAY)
+	average = sum(readings) / len(readings)
+	print(f"  Average raw reading: {average:.2f} mm")
+	return average, readings
+
 
 def calibrate_vl53_sensors(sensors):
-    """
-    Calibrate VL53L0X sensors at fully retracted position
-    
-    This routine assumes actuators are at MIN_POSITION (fully retracted).
-    It takes multiple samples and stores the baseline readings.
-    
+	"""
+    Calibrate VL53L0X sensors against a known reference distance.
+
+    Place a flat target exactly KNOWN_DISTANCE_MM in front of each sensor.
+    The function averages CALIBRATION_SAMPLES readings, computes the error
+    vs the known distance, and saves a software offset to CALIBRATION_FILE.
+
+    That offset is later applied by get_calibrated_reading() to correct
+    every reading transparently.
+
     Args:
-        sensors (dict): Dictionary of sensor objects
-        
+        sensors (dict): Must contain 'vl53l0x_0' and 'vl53l0x_1' keys mapped
+                        to initialised adafruit_vl53l0x.VL53L0X objects.
+
     Returns:
-        dict: Calibration data containing baseline readings
+        dict: Calibration data for both sensors.
     """
-    print("\n" + "="*50)
-    print("VL53L0X SENSOR CALIBRATION")
-    print("="*50)
-    print("\nEnsure actuators are fully retracted before continuing!")
-    input("Press ENTER when ready to calibrate...")
-    
-    calibration_data = {}
-    
-    # Calibrate VL53L0X #1
-    print(f"\nCalibrating VL53L0X #1 (taking {CALIBRATION_SAMPLES} samples)...")
-    vl53_0_readings = []
-    for i in range(CALIBRATION_SAMPLES):
-        reading = get_sensor_value(sensors, 'vl53l0x_0')
-        vl53_0_readings.append(reading)
-        print(f"  Sample {i+1}/{CALIBRATION_SAMPLES}: {reading} mm")
-        time.sleep(SAMPLE_DELAY)
-    
-    vl53_0_baseline = sum(vl53_0_readings) / len(vl53_0_readings)
-    print(f"  Average baseline: {vl53_0_baseline:.2f} mm")
-    
-    # Calibrate VL53L0X #2
-    print(f"\nCalibrating VL53L0X #2 (taking {CALIBRATION_SAMPLES} samples)...")
-    vl53_1_readings = []
-    for i in range(CALIBRATION_SAMPLES):
-        reading = get_sensor_value(sensors, 'vl53l0x_1')
-        vl53_1_readings.append(reading)
-        print(f"  Sample {i+1}/{CALIBRATION_SAMPLES}: {reading} mm")
-        time.sleep(SAMPLE_DELAY)
-    
-    vl53_1_baseline = sum(vl53_1_readings) / len(vl53_1_readings)
-    print(f"  Average baseline: {vl53_1_baseline:.2f} mm")
-    
-    # Store calibration data
-    calibration_data = {
-        'vl53l0x_0': {
-            'baseline_mm': vl53_0_baseline,
-            'samples': vl53_0_readings,
-            'timestamp': time.time()
-        },
-        'vl53l0x_1': {
-            'baseline_mm': vl53_1_baseline,
-            'samples': vl53_1_readings,
-            'timestamp': time.time()
-        }
-    }
-    
-    # Save to file
-    save_calibration(calibration_data)
-    
-    print("\n" + "="*50)
-    print("CALIBRATION COMPLETE")
-    print("="*50)
-    print(f"VL53L0X #1 baseline: {vl53_0_baseline:.2f} mm")
-    print(f"VL53L0X #2 baseline: {vl53_1_baseline:.2f} mm")
-    print(f"Data saved to: {CALIBRATION_FILE}\n")
-    
-    return calibration_data
+	print("\n" + "=" * 50)
+	print("VL53L0X SENSOR CALIBRATION")
+	print("=" * 50)
+	print(f"\nPlace a flat target exactly {KNOWN_DISTANCE_MM} mm in front of EACH sensor.")
+	input("Press ENTER when ready to calibrate...\n")
+
+	sensor_configs = [
+		("vl53l0x_0", "VL53L0X #1"),
+		("vl53l0x_1", "VL53L0X #2"),
+	]
+
+	for sensor_key, label in sensor_configs:
+		print(f"\nCalibrating {label}...")
+		print(f"  Known distance: {KNOWN_DISTANCE_MM} mm")
+
+		average_raw, samples = _read_raw_average(sensors, sensor_key)
+
+		error = average_raw - KNOWN_DISTANCE_MM
+		offset = -error  # add this to future raw readings to correct them
+
+		print(f"  Error vs known distance : {error:+.2f} mm")
+		print(f"  Software offset         : {offset:+.2f} mm")
+
+		calibration_data[sensor_key] = {
+			"known_distance_mm": KNOWN_DISTANCE_MM,
+			"raw_average_mm": round(average_raw, 3),
+			"error_mm": round(error, 3),
+			"offset_mm": round(offset, 3),
+			"samples": samples,
+			"timestamp": time.time(),
+		}
+
+	save_calibration(calibration_data)
+
+	print("\n" + "=" * 50)
+	print("CALIBRATION COMPLETE")
+	print("=" * 50)
+	for sensor_key, data in calibration_data.items():
+		print(
+			f"  {sensor_key}: raw avg {data['raw_average_mm']:.2f} mm | "
+			f"error {data['error_mm']:+.3f} mm | "
+			f"offset {data['offset_mm']:+.3f} mm"
+		)
+	print(f"  Data saved to config.OFFSETS\n")
+
+	return calibration_data
 
 
 def save_calibration(calibration_data):
-    """Save calibration data to JSON file"""
-    with open(CALIBRATION_FILE, 'w') as f:
-        json.dump(calibration_data, f, indent=2)
-    print(f"\nCalibration data saved to {CALIBRATION_FILE}")
+	"""Persists calibration offsets into config.py"""
 
-
-def load_calibration():
-    """
-    Load calibration data from file
-    
-    Returns:
-        dict: Calibration data or None if file doesn't exist
-    """
-    cal_path = Path(CALIBRATION_FILE)
-    if not cal_path.exists():
-        print(f"Warning: Calibration file {CALIBRATION_FILE} not found")
-        return None
-    
-    try:
-        with open(CALIBRATION_FILE, 'r') as f:
-            calibration_data = json.load(f)
-        print(f"Loaded calibration data from {CALIBRATION_FILE}")
-        return calibration_data
-    except Exception as e:
-        print(f"Error loading calibration file: {e}")
-        return None
+	offsets = {
+		sensor: data["offset_mm"]
+		for sensor, data in calibration_data.items()
+	}
+	
+	# Read existing config file
+	with open("config.py", "r") as f:
+		lines = f.readlines()
+		
+	# Replace OFFSET line if it exists
+	found = False
+	for i, line in enumerate(lines):
+		if line.startswith("OFFSET"):
+			lines[i] = f"OFFSET = {pprint.pformat(offsets)}\n"
+			found = True
+			break
+	
+	# If not found, append it
+	if not found:
+		lines.append("\n# Calibration Offsets (auto-generated)\n")
+		lines.append(f"OFFSETS = {pprint.pformat(offsets)}\n")
+		
+	# Write back safely
+	with open("config.py", "w") as f:
+		f.writelines(lines)
+		
+	print("\nOffsets writen to config.py:")
+	for k, v in offsets.items():
+		print(f"	{k}: {v:+3f} mm")
+	
+	# Also update runtime values
+	config.OFFSET = offsets
+	
 
 
 def get_calibrated_reading(sensors, sensor_name, calibration_data):
-    """
-    Get sensor reading relative to calibrated baseline
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        sensor_name (str): Name of sensor ('vl53l0x_0' or 'vl53l0x_1')
-        calibration_data (dict): Calibration data
-        
-    Returns:
-        dict: Contains 'raw_mm', 'baseline_mm', 'offset_mm'
-    """
-    if calibration_data is None:
-        raise RuntimeError("No calibration data available. Run calibration first.")
-    
-    if sensor_name not in calibration_data:
-        raise RuntimeError(f"Sensor {sensor_name} not found in calibration data")
-    
-    raw_reading = get_sensor_value(sensors, sensor_name)
-    baseline = calibration_data[sensor_name]['baseline_mm']
-    offset = raw_reading - baseline
-    
-    return {
-        'raw_mm': raw_reading,
-        'baseline_mm': baseline,
-        'offset_mm': offset
-    }
-
-
-def print_calibration_info(calibration_data):
-    """Print stored calibration information"""
-    if calibration_data is None:
-        print("No calibration data available")
-        return
-    
-    print("\n" + "="*50)
-    print("CALIBRATION DATA")
-    print("="*50)
-    
-    for sensor_name, data in calibration_data.items():
-        print(f"\n{sensor_name.upper()}:")
-        print(f"  Baseline: {data['baseline_mm']:.2f} mm")
-        print(f"  Timestamp: {time.ctime(data['timestamp'])}")
-        if 'samples' in data:
-            print(f"  Sample range: {min(data['samples'])} - {max(data['samples'])} mm")
-    
-    print("\n" + "="*50 + "\n")
+	if not hasattr(config, "OFFSET") or not config.OFFSEt:
+		raise RuntimeError("No calibration data available. Run calibration first.")
+	
+	if sensor_name not in config.OFFSET:
+		raise RuntimeError(f"Sensor '{sensor_name}' not found in config.OFFSET")
+	
+	raw = get_sensor_value(sensors, sensor_name)
+	offset = config.OFFSET[sensor_name]
+	corrected = raw + offset
+	
+	return {
+		"raw_mm": raw,
+		"corrected_mm": round(corrected, 3),
+		"offset_mm": offset,
+		}

@@ -45,6 +45,8 @@ def init_vl53l0x(tca, channel, name):
     def _init():
         sensor = adafruit_vl53l0x.VL53L0X(tca[channel])
         sensor.measurement_timing_budget = config.VL53_TIMING_BUDGET
+        sensor.signal_rate_limit = config.VL53_RATE_LIMIT
+        sensor.sigma_limit = config.VL53_SIGMA_LIMIT
         read_with_timeout(lambda: sensor.range, f"{name} range validation")
         return sensor
         
@@ -100,4 +102,4 @@ def get_sensor_value(sensors, sensor_name):
         return pitch
     
     else:
-        raise RuntimeError(f"Sensor nemed {sensor_name} not recognized")
+        raise RuntimeError(f"Sensor named {sensor_name} not recognized")

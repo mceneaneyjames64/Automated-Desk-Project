@@ -1,169 +1,150 @@
 """
-Motor control functions for actuator positioning using VL53L0X sensors
+Motor control functions for actuator positioning using VL53L0X sensors.
+
+All sensor names and motor commands are resolved through config constants —
+no bare string literals or direct byte literals appear in this module.
 """
+
 import time
-from hardware import get_sensor_value
+
 import config
+from hardware import get_sensor_value
 
 
-def move_station_distance(sensors, name, target_distance, ser=None, tolerance=2, timeout=30):
+def _get_motor_commands(sensor_name: str) -> dict:
     """
-    Move actuator to specific distance reading
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        name (str): Sensor name ('vl53l0x_0' or 'vl53l0x_1')
-        target_distance (int): Target distance in mm
-        ser: Serial port object for motor control (optional if just reading)
-        tolerance (int): Acceptable distance tolerance in mm (default: 2mm)
-        timeout (float): Maximum time to attempt movement in seconds
-        
-    Returns:
-        bool: True if target reached, False if timeout
+    Return the ``{"extend": ..., "retract": ...}`` command dict for *sensor_name*.
+
+    Raises
+    ------
+    ValueError
+        If *sensor_name* has no associated motor commands in config.
     """
-    
-    # Check if serial port provided
+    try:
+        return config.SENSOR_MOTOR_COMMANDS[sensor_name]
+    except KeyError:
+        valid = list(config.SENSOR_MOTOR_COMMANDS.keys())
+        raise ValueError(
+            f"No motor commands defined for sensor '{sensor_name}'. "
+            f"Valid sensors: {valid}"
+        )
+
+
+def move_to_distance(sensors: dict, sensor_name: str, target_mm: int,
+                     ser, tolerance: int = 2, timeout: float = 30) -> bool:
+    """
+    Move an actuator until its paired sensor reads *target_mm*.
+
+    Parameters
+    ----------
+    sensors:
+        Dictionary of initialised sensor objects.
+    sensor_name:
+        One of the ``config.SENSOR_VL53_*`` constants.
+    target_mm:
+        Target distance in millimetres.
+    ser:
+        Open ``serial.Serial`` object used to send motor commands.
+    tolerance:
+        Acceptable distance error in millimetres (default 2 mm).
+    timeout:
+        Maximum movement duration in seconds (default 30 s).
+
+    Returns
+    -------
+    bool
+        ``True`` if the target was reached, ``False`` on timeout.
+    """
     if ser is None:
-        raise ValueError("Serial port object (ser) is required for motor control")
+        raise ValueError("A serial port object is required for motor control.")
+
+    motor_cmds = _get_motor_commands(sensor_name)
+    cmd_extend  = motor_cmds["extend"]
+    cmd_retract = motor_cmds["retract"]
     
-    # Validate sensor name
-    if name not in ['vl53l0x_0', 'vl53l0x_1']:
-        raise ValueError(f"Invalid sensor name: {name}. Must be 'vl53l0x_0' or 'vl53l0x_1'")
+    clamped_mm = max(config.MIN_POSITION, min(config.MAX_POSITION, target_mm))
+
+    if clamped_mm != target_mm:
+        print(f"[motor] Position {target_mm} mm clamped to {clamped_mm} mm "
+              f"(limits: {config.MIN_POSITION}–{config.MAX_POSITION} mm).")
     
-    # Select motor commands based on sensor
-    if name == 'vl53l0x_0':
-        motor_in = config.M1_IN
-        motor_out = config.M1_OUT
-    else:  # vl53l0x_1
-        motor_in = config.M2_IN
-        motor_out = config.M2_OUT
-    
-    print(f"Moving {name} to {target_distance}mm (tolerance: ±{tolerance}mm)")
-    
+    target_distance = target_distance - config.OFFSET[name]
+
+    print(f"[motor] Moving '{sensor_name}' → {target_mm} mm  (±{tolerance} mm)")
+
     start_time = time.monotonic()
-    
+
     while True:
-        # Check timeout
         if time.monotonic() - start_time > timeout:
-            ser.write(config.OFF)
-            print(f"Timeout reached after {timeout}s")
+            ser.write(config.CMD_ALL_OFF)
+            print(f"[motor] Timeout after {timeout} s — motion aborted.")
             return False
-        
-        # Get current distance
-        current_distance = get_sensor_value(sensors, name)
-        error = current_distance - target_distance
-        
-        # Check if within tolerance
+
+        current_mm = get_sensor_value(sensors, sensor_name)
+        error      = current_mm - target_mm
+
         if abs(error) <= tolerance:
-            ser.write(config.OFF)
-            print(f"Target reached: {current_distance}mm (target: {target_distance}mm)")
+            ser.write(config.CMD_ALL_OFF)
+            print(f"[motor] Target reached: {current_mm} mm (target {target_mm} mm).")
             return True
-        
-        # Move based on error
-        if error > tolerance:
-            # Current distance > target, need to retract (move IN)
-            ser.write(motor_in)
-        elif error < -tolerance:
-            # Current distance < target, need to extend (move OUT)
-            ser.write(motor_out)
-        
-        time.sleep(0.05)  # Small delay to avoid overwhelming the sensor
+
+        # Positive error  → sensor reads too far → retract
+        # Negative error  → sensor reads too close → extend
+        ser.write(cmd_retract if error > 0 else cmd_extend)
+
+        time.sleep(0.05)   # Avoid overwhelming the sensor
 
 
-def move_station_distance_calibrated(sensors, calibration_data, name, 
-                                     target_offset, ser=None, tolerance=2, timeout=30):
+
+def retract_fully(sensors: dict, sensor_name: str,
+                  ser, timeout: float = 30) -> bool:
     """
-    Move actuator to specific offset from calibrated baseline
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        calibration_data (dict): Calibration data with baselines
-        name (str): Sensor name ('vl53l0x_0' or 'vl53l0x_1')
-        target_offset (int): Target offset from baseline in mm (positive = extended)
-        ser: Serial port object for motor control (optional keyword argument)
-        tolerance (int): Acceptable distance tolerance in mm
-        timeout (float): Maximum time to attempt movement in seconds
-        
-    Returns:
-        bool: True if target reached, False if timeout
-    """
-    if calibration_data is None or name not in calibration_data:
-        raise RuntimeError(f"No calibration data for {name}")
-    
-    baseline = calibration_data[name]['baseline_mm']
-    target_distance = baseline + target_offset
-    
-    print(f"Moving {name} to offset {target_offset}mm (absolute: {target_distance}mm)")
-    
-    return move_station_distance(sensors, name, target_distance, ser, tolerance, timeout)
+    Drive an actuator to the minimum safe position (``config.MIN_POSITION``).
 
+    Parameters
+    ----------
+    sensors:
+        Dictionary of initialised sensor objects.
+    sensor_name:
+        One of the ``config.SENSOR_VL53_*`` constants.
+    ser:
+        Open ``serial.Serial`` object.
+    timeout:
+        Maximum movement duration in seconds (default 30 s).
 
-def move_to_retracted(sensors, name, ser=None, timeout=30):
-    """
-    Move actuator to fully retracted position (MIN_POSITION)
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        name (str): Sensor name
-        ser: Serial port object (optional keyword argument)
-        timeout (float): Maximum time in seconds
-        
-    Returns:
-        bool: True if successful
+    Returns
+    -------
+    bool
+        ``True`` if fully retracted, ``False`` on timeout.
     """
     if ser is None:
-        raise ValueError("Serial port object (ser) is required for motor control")
-    
-    print(f"Retracting {name} to minimum position...")
-    
-    # Select motor based on sensor
-    motor_in = config.M1_IN if name == 'vl53l0x_0' else config.M2_IN
-    
+        raise ValueError("A serial port object is required for motor control.")
+
+    motor_cmds  = _get_motor_commands(sensor_name)
+    cmd_retract = motor_cmds["retract"]
+
+    print(f"[motor] Retracting '{sensor_name}' to minimum position "
+          f"({config.MIN_POSITION} mm) …")
+
     start_time = time.monotonic()
-    
+
     while time.monotonic() - start_time < timeout:
-        current = get_sensor_value(sensors, name)
-        
-        # Check if we've reached minimum (distance stops decreasing)
-        if current <= config.MIN_POSITION:
-            ser.write(config.OFF)
-            print(f"{name} retracted to {current}mm")
+        current_mm = get_sensor_value(sensors, sensor_name)
+
+        if current_mm <= config.MIN_POSITION:
+            ser.write(config.CMD_ALL_OFF)
+            print(f"[motor] '{sensor_name}' retracted to {current_mm} mm.")
             return True
-        
-        ser.write(motor_in)
+
+        ser.write(cmd_retract)
         time.sleep(0.1)
-    
-    ser.write(config.OFF)
-    print(f"Timeout while retracting {name}")
+
+    ser.write(config.CMD_ALL_OFF)
+    print(f"[motor] Timeout while retracting '{sensor_name}'.")
     return False
 
 
-def move_to_position_limits(sensors, name, position, ser=None, timeout=30):
-    """
-    Move actuator with safety limits enforced
-    
-    Args:
-        sensors (dict): Dictionary of sensor objects
-        name (str): Sensor name
-        position (int): Target position in mm
-        ser: Serial port object (optional keyword argument)
-        timeout (float): Maximum time in seconds
-        
-    Returns:
-        bool: True if target reached
-    """
-    # Enforce limits
-    if position < config.MIN_POSITION:
-        print(f"Warning: Position {position} below MIN_POSITION ({config.MIN_POSITION}), clamping")
-        position = config.MIN_POSITION
-    elif position > config.MAX_POSITION:
-        print(f"Warning: Position {position} above MAX_POSITION ({config.MAX_POSITION}), clamping")
-        position = config.MAX_POSITION
-    
-    return move_station_distance(sensors, name, position, ser, timeout=timeout)
-
-
-def emergency_stop(ser):
-    """Send emergency stop command to all motors"""
-    ser.write(config.OFF)
-    print("EMERGENCY STOP - All motors disabled")
+def emergency_stop(ser) -> None:
+    """Send an immediate stop command to all motors."""
+    ser.write(config.CMD_ALL_OFF)
+    print("[motor] EMERGENCY STOP — all motors disabled.")
