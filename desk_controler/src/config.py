@@ -4,6 +4,9 @@ RETRY_DELAY = 0.2
 OPERATION_TIMEOUT = 5
 READ_TIMEOUT = 1.0
 
+# Sensor Offsets (auto-generated)
+OFFSET = {'vl53l0x_0': -48.7, 'vl53l0x_1': -8190.3}
+
 # VL53L0X Configuration
 
 # Measurment timing budget (microseconds)

@@ -38,6 +38,8 @@ def move_station_distance(sensors, name, target_distance, ser=None, tolerance=2,
         motor_in = config.M2_IN
         motor_out = config.M2_OUT
     
+    target_distance = target_distance - config.OFFSET[name]
+    
     print(f"Moving {name} to {target_distance}mm (tolerance: ±{tolerance}mm)")
     
     # Enforce limits

@@ -17,9 +17,8 @@ from motor_control import (
 	
 from calibration import (
 	calibrate_vl53_sensors, 
-	load_calibration, 
-	get_calibrated_reading,
-	print_calibration_info
+	save_calibration, 
+	get_calibrated_reading
 	)
 	
 import config
@@ -68,10 +67,6 @@ def run_test(sensors, ser, cycle_number, writer, csv_file):
     print(f"  Cycle {cycle_number}  —  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'─'*60}")
     
-    print(f"cont mode: {sensors["vl53l0x_0"].is_continuous_mode}")
-    temp = sensors["vl53l0x_0"].do_range_measurement()
-    print(temp)
-
     for label, offset in SEQUENCE:
 
         print(f"\n  → Moving: {label}  (target: {offset:.1f} mm)")
@@ -113,7 +108,7 @@ def run_test(sensors, ser, cycle_number, writer, csv_file):
         writer.writerow(row)
         csv_file.flush()
 
-    print(f"\n  ↩  Retracting...")
+    print(f"\n  Retracting...")
     move_to_retracted(sensors, "vl53l0x_0", ser)
     print(f"  Done. Actuator retracted.")
 
@@ -132,7 +127,6 @@ def main():
 		ser = init_serial()
 
 		# Calibrate TOF sensors
-		#calibrate_vl53_sensors(sensors)
 		calibrate_vl53_sensors(sensors)
 		
 		
@@ -166,7 +160,8 @@ def main():
 		traceback.print_exc()
 		return 1
 	finally:
-		ser.write(config.OFF)
+		if 'ser' in locals() and ser is not None:
+			ser.write(config.OFF)
 		csv_file.close()
 		print(f"Results saved to {LOG_FILE}")
 		

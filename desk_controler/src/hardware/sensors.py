@@ -102,4 +102,4 @@ def get_sensor_value(sensors, sensor_name):
         return pitch
     
     else:
-        raise RuntimeError(f"Sensor nemed {sensor_name} not recognized")
+        raise RuntimeError(f"Sensor named {sensor_name} not recognized")
