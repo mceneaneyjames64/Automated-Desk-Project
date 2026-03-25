@@ -1,54 +1,77 @@
+# =============================================================================
 # I2C Configuration
+# =============================================================================
 I2C_RETRIES = 3
 RETRY_DELAY = 0.2
 OPERATION_TIMEOUT = 5
 READ_TIMEOUT = 1.0
 
+# =============================================================================
 # Sensor Offsets (auto-generated)
+# =============================================================================
 OFFSET = {'vl53l0x_0': -48.7, 'vl53l0x_1': -8190.3}
 
-# VL53L0X Configuration
-
-# Measurment timing budget (microseconds)
-# Higher = more accurate
-VL53_TIMING_BUDGET = 200000
-
-# Signal rate limit (affects valid measurment threshold) (MCPS)
-# Lower = more permissive (detects weak returns)
-# Higher = stricted (better accuracy on clean targets)
-# Range: 0.1 - 0.5
-# For accuracy in solid targets, use 0.25 - 0.5
-VL53_RATE_LIMIT = 0.25
-
-# Enable sigma (noise) estimation limit (millimeters)
-# Lower vlaue = only accept low-noise readings
-VL53_SIGMA_LIMIT = 9
-
-# I2C adress
-VL53_ADDRESS = 0x29
-
-# MUX channels
+# =============================================================================
+# TCA9548A Multiplexer Channel Assignments
+# =============================================================================
 VL53_CHANNEL_1 = 0
 VL53_CHANNEL_2 = 1
+ADXL_CHANNEL   = 2
 
-# ADXL345 Configuration
-ADXL_ADDRESS = 0x53
-ADXL_CHANNEL = 2
+# =============================================================================
+# Sensor I2C Addresses
+# =============================================================================
+VL53_ADDRESS  = 0x29
+ADXL_ADDRESS  = 0x53
 
-# Serial Configuration
-SERIAL_PORT = '/dev/serial0'
+# =============================================================================
+# Sensor Name Constants
+#   Use these everywhere instead of bare string literals.
+# =============================================================================
+SENSOR_VL53_0 = "vl53l0x_0"
+SENSOR_VL53_1 = "vl53l0x_1"
+SENSOR_ADXL   = "adxl345"
+SENSOR_MUX    = "mux"
+
+# Convenience tuple for iterating over distance sensors only
+DISTANCE_SENSORS = (SENSOR_VL53_0, SENSOR_VL53_1)
+
+# =============================================================================
+# VL53L0X Sensor Configuration
+# =============================================================================
+VL53_TIMING_BUDGET = 100000   # microseconds
+VL53_RATE_LIMIT = 0.25   # (MCPS)
+VL53_SIGMA_LIMIT = 9   # millimeters
+
+# =============================================================================
+# Serial / UART Configuration
+# =============================================================================
+SERIAL_PORT     = '/dev/serial0'
 SERIAL_BAUDRATE = 2400
-SERIAL_TIMEOUT = 1
+SERIAL_TIMEOUT  = 1           # seconds
 
-# Motor Control Commands
-OFF    = b'\x5a\x00\x5a'
-M1_OUT = b'\x5a\x01\x5b'
-M1_IN  = b'\x5a\x02\x5c'
-M2_OUT = b'\x5a\x04\x5e'
-M2_IN  = b'\x5a\x08\x62'
-M3_OUT = b'\x5a\x10\x6a'
-M3_IN  = b'\x5a\x20\x7a'
+# =============================================================================
+# Motor Control Commands  (3-byte packets: header, command, checksum)
+# =============================================================================
+CMD_ALL_OFF = b'\x5a\x00\x5a'   # Stop all motors
 
-# Position Limits
+CMD_M1_EXTEND  = b'\x5a\x01\x5b'   # Motor 1 extend  (OUT)
+CMD_M1_RETRACT = b'\x5a\x02\x5c'   # Motor 1 retract (IN)
+
+CMD_M2_EXTEND  = b'\x5a\x04\x5e'   # Motor 2 extend  (OUT)
+CMD_M2_RETRACT = b'\x5a\x08\x62'   # Motor 2 retract (IN)
+
+CMD_M3_EXTEND  = b'\x5a\x10\x6a'   # Motor 3 extend  (OUT)
+CMD_M3_RETRACT = b'\x5a\x20\x7a'   # Motor 3 retract (IN)
+
+# Map each distance sensor to its motor commands for use in motor_control.py
+SENSOR_MOTOR_COMMANDS = {
+    SENSOR_VL53_0: {"extend": CMD_M1_EXTEND, "retract": CMD_M1_RETRACT},
+    SENSOR_VL53_1: {"extend": CMD_M2_EXTEND, "retract": CMD_M2_RETRACT},
+}
+
+# =============================================================================
+# Position Limits  (millimetres)
+# =============================================================================
 MIN_POSITION = 20
 MAX_POSITION = 390
