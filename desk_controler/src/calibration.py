@@ -11,13 +11,13 @@ import config
 import pprint
 from hardware import get_sensor_value
 
-CALIBRATION_SAMPLES = 10
+CALIBRATION_SAMPLES = 30
 SAMPLE_DELAY = 0.1
 
-# Place a flat target exactly this far from each sensor before calibrating.
+# KNOWN_DISTANCE_MM is the true distance from the sensor face to the target
+# during calibration. Set to 0 when calibrating at the fully retracted position
+# (sensor reads its resting distance naturally; offset corrects that to zero).
 KNOWN_DISTANCE_MM = 0
-
-calibration_data = {}
 
 def _read_raw_average(sensors, sensor_key, num_samples=CALIBRATION_SAMPLES):
 	"""Take multiple readings and return (average, list_of_samples)."""
@@ -35,30 +35,18 @@ def _read_raw_average(sensors, sensor_key, num_samples=CALIBRATION_SAMPLES):
 def calibrate_vl53_sensors(sensors):
 	"""
     Calibrate VL53L0X sensors against a known reference distance.
-
-    Place a flat target exactly KNOWN_DISTANCE_MM in front of each sensor.
-    The function averages CALIBRATION_SAMPLES readings, computes the error
-    vs the known distance, and saves a software offset to CALIBRATION_FILE.
-
-    That offset is later applied by get_calibrated_reading() to correct
-    every reading transparently.
-
-    Args:
-        sensors (dict): Must contain 'vl53l0x_0' and 'vl53l0x_1' keys mapped
-                        to initialised adafruit_vl53l0x.VL53L0X objects.
-
-    Returns:
-        dict: Calibration data for both sensors.
     """
 	print("\n" + "=" * 50)
 	print("VL53L0X SENSOR CALIBRATION")
 	print("=" * 50)
-	print(f"\nPlace a flat target exactly {KNOWN_DISTANCE_MM} mm in front of EACH sensor.")
+	print("\nEnsure actuators are fully retracted before continuing.")
 	input("Press ENTER when ready to calibrate...\n")
 
+	calibration_data = {}
+
 	sensor_configs = [
-		("vl53l0x_0", "VL53L0X #1"),
-		("vl53l0x_1", "VL53L0X #2"),
+		(config.SENSOR_VL53_0, "VL53L0X #1"),
+		(config.SENSOR_VL53_1, "VL53L0X #2"),
 	]
 
 	for sensor_key, label in sensor_configs:
@@ -93,7 +81,7 @@ def calibrate_vl53_sensors(sensors):
 			f"error {data['error_mm']:+.3f} mm | "
 			f"offset {data['offset_mm']:+.3f} mm"
 		)
-	print(f"  Data saved to config.OFFSETS\n")
+	print(f"  Data saved to config.OFFSET\n")
 
 	return calibration_data
 
@@ -121,23 +109,34 @@ def save_calibration(calibration_data):
 	# If not found, append it
 	if not found:
 		lines.append("\n# Calibration Offsets (auto-generated)\n")
-		lines.append(f"OFFSETS = {pprint.pformat(offsets)}\n")
+		lines.append(f"OFFSET = {pprint.pformat(offsets)}\n")
 		
 	# Write back safely
 	with open("config.py", "w") as f:
 		f.writelines(lines)
 		
-	print("\nOffsets writen to config.py:")
+	print("\nOffsets written to config.py:")
 	for k, v in offsets.items():
-		print(f"	{k}: {v:+3f} mm")
+		print(f"	{k}: {v:+.3f} mm")
 	
 	# Also update runtime values
 	config.OFFSET = offsets
 	
 
+def load_calibration():
+	"""Load calibration data from config.OFFSET, or return None if not set."""
+	if not hasattr(config, "OFFSET") or not config.OFFSET:
+		return None
+	# Reconstruct calibration_data shape from the flat offset dict
+	data = {}
+	for sensor_name, offset_mm in config.OFFSET.items():
+		data[sensor_name] = {"offset_mm": offset_mm}
+	return data
+
 
 def get_calibrated_reading(sensors, sensor_name, calibration_data):
-	if not hasattr(config, "OFFSET") or not config.OFFSEt:
+	"""Return raw and offset-corrected reading for sensor_name."""
+	if not hasattr(config, "OFFSET") or not config.OFFSET:
 		raise RuntimeError("No calibration data available. Run calibration first.")
 	
 	if sensor_name not in config.OFFSET:
