@@ -36,7 +36,6 @@ def init_mux(i2c, retries=config.I2C_RETRIES, retry_delay=config.RETRY_DELAY):
                 print("TCA9548A initialized successfully")
                 return tca
         except Exception as e:
-            """sleep before retrying"""
             last_exc = e
             print(f"TCA9548A attempt {attempt}/{retries} failed: {e}")
             if attempt < retries:
@@ -53,7 +52,6 @@ def scan_i2c_channels(tca, timeout_per_channel=1.0):
             with timeout(timeout_per_channel, f"Channel {channel} scan timeout"):
                 if tca[channel].try_lock():
                     try:
-                        """Check for devices and report which is connected"""
                         addresses = tca[channel].scan()
                         devices = [hex(addr) for addr in addresses if addr != 0x70]
                         print(f"Channel {channel}: {devices if devices else 'No devices'}")

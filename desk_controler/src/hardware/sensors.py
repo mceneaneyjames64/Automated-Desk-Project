@@ -72,34 +72,39 @@ def init_adxl345(tca):
 
 def get_sensor_value(sensors, sensor_name):
     """
-    Get current value from a sensor
-    
+    Get current value from a sensor.
+
     Args:
         sensors (dict)   : Dictionary of sensor objects
-        sensor_name (str): Name of sensor to be read
-        
+        sensor_name (str): One of config.SENSOR_VL53_0, config.SENSOR_VL53_1,
+                           or config.SENSOR_ADXL
+
     Returns:
-        int: Distance reading in millimeters or pitch reading in degrees
+        int  : Distance in millimetres for VL53L0X sensors
+        float: Pitch angle in degrees for the ADXL345
     """
-    if sensor_name == "vl53l0x_0":
+    if sensor_name == config.SENSOR_VL53_0:
         return read_with_timeout(
-            lambda: sensors["vl53l0x_0"].range,
-            "vl53l0x_0 range read"
+            lambda: sensors[config.SENSOR_VL53_0].range,
+            f"{config.SENSOR_VL53_0} range read"
         )
         
-    elif sensor_name == "vl53l0x_1":
+    elif sensor_name == config.SENSOR_VL53_1:
         return read_with_timeout(
-            lambda: sensors["vl53l0x_1"].range,
-            "vl53l0x_1 range read"
+            lambda: sensors[config.SENSOR_VL53_1].range,
+            f"{config.SENSOR_VL53_1} range read"
         )
         
-    elif sensor_name == "adxl345":
+    elif sensor_name == config.SENSOR_ADXL:
         x, y, z = read_with_timeout(
-            lambda: sensors["adxl345"].acceleration,
-            "ADXL345 acceleration read"
+            lambda: sensors[config.SENSOR_ADXL].acceleration,
+            f"{config.SENSOR_ADXL} acceleration read"
         )
-        pitch = vector_to_degrees(z, y)
-        return pitch
+        return vector_to_degrees(z, y)
     
     else:
-        raise RuntimeError(f"Sensor named {sensor_name} not recognized")
+        raise RuntimeError(
+            f"Sensor '{sensor_name}' is not recognised. "
+            f"Valid names: {config.SENSOR_VL53_0!r}, "
+            f"{config.SENSOR_VL53_1!r}, {config.SENSOR_ADXL!r}."
+        )
