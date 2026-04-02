@@ -22,6 +22,8 @@ from calibration import (
 	)
 	
 import config
+
+from updated_desk_code import preset_positions, payload
  
 from datetime import datetime
 import time
