@@ -131,6 +131,69 @@ def run_test(sensors, ser, cycle_number, writer, csv_file):
     retract_fully(sensors, config.SENSOR_VL53_0, ser)
     print(f"  Done. Actuator retracted.")
 
+def interpret_payload(payload):
+	if "monitor_tilt" in payload:
+		sens = config.SENSOR_ADX1345
+	if "keyboard" in payload:
+		sens = config.SENSOR_VL53_0
+	if "monitor_up" or "monitor_down" in payload:
+		sens = config.SENSOR_VL53_1
+
+	if "preset" in payload:
+		if not "set" in payload:
+			if "_one" in payload:
+				preset = preset_positions[1]
+			if "_two" in payload:
+				preset = preset_positions[2]
+			if "_three" in payload:
+				preset = preset_positions[3]
+			return preset
+		if "set_preset" in paylaod:
+			tilt_reading = read_corrected(sensors, config.SENSOR_ADX1345)
+			montitor_reading = read_corrected(sensors, config.SENSOR_VL53_1)
+			keyboard_reading = read_corrected(sensors, config.SENSOR_VL53_0)
+			preset = {tilt_reading, monitor_reading, keyboard_reading}
+
+	if "calibrate" in payload:
+		#FIXME: need a way to pass the
+		tilt_reading = 0
+		monitor_reading = 0
+		keyboard_reading = 0
+
+	if "emergency_stop" in paylaod:
+		#FIXME: immediately stop the commands from running
+		
+	return sens
+		
+
+
+def call_preset(preset, payload):
+	print(f"\n Moving to {payload}, please wait until movement completed... \n")
+	curr = _read_corrected(sensors, sensor_name)
+	
+	if curr != preset:
+		move_to_distance(sensors, config.SENSOR_ADX1345, preset, ser)
+		move_to_distance(sensors, config.SENSOR_VL53_0, preset, ser)
+		move_to_distance(sensors, config.SENSOR_VL53_1, preset, ser)
+		while True:
+			curr = _read_corrected(sensors, sensor_name)
+			if (curr == preset):
+				print(f"\n Moving to {payload} is completed. \n")
+				break
+	return curr
+
+def increment_move(preset, payload):
+	"""Move to current location plus one millimeter
+	The plus one below may need to be updated once minimum measurement has been taken"""
+	curr = _read_corrected(sensors, sensor_name)
+	sens = inperpret_payload(payload)
+	
+	if payload.endswith("_up"):
+		updated = curr + 1 
+		move_to_distance(sensors, sens, updated, ser)
+	if payload.endswith("_down"):
+		updated = curr - 1
+		move_to_distance(sensors, sens, updated, ser)
 
 def main():
 	"""Main program"""
