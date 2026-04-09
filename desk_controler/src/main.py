@@ -23,7 +23,7 @@ from calibration import (
 	
 import config
 
-from updated_desk_code import preset_positions, payload
+from DeskCodeIntegration-UpdatedPositionPublish import preset_positions, payload
  
 from datetime import datetime
 import time
@@ -149,23 +149,31 @@ def interpret_payload(payload):
 				preset = preset_positions[3]
 			return preset
 		if "set_preset" in paylaod:
-			tilt_reading = read_corrected(sensors, config.SENSOR_ADX1345)
-			montitor_reading = read_corrected(sensors, config.SENSOR_VL53_1)
-			keyboard_reading = read_corrected(sensors, config.SENSOR_VL53_0)
-			preset = {tilt_reading, monitor_reading, keyboard_reading}
+			if "one" in payload:
+				tilt_reading = _read_corrected(sensors, config.SENSOR_ADX1345)
+				montitor_reading = _read_corrected(sensors, config.SENSOR_VL53_1)
+				keyboard_reading = _read_corrected(sensors, config.SENSOR_VL53_0)
+				preset_positions[1] = {tilt_reading, monitor_reading, keyboard_reading}
+			if "two" in payload:
+				tilt_reading = _read_corrected(sensors, config.SENSOR_ADX1345)
+				montitor_reading = _read_corrected(sensors, config.SENSOR_VL53_1)
+				keyboard_reading = _read_corrected(sensors, config.SENSOR_VL53_0)
+				preset_positions[2] = {tilt_reading, monitor_reading, keyboard_reading}
+			if "three" in payload:
+				tilt_reading = _read_corrected(sensors, config.SENSOR_ADX1345)
+				montitor_reading = _read_corrected(sensors, config.SENSOR_VL53_1)
+				keyboard_reading = _read_corrected(sensors, config.SENSOR_VL53_0)
+				preset_positions[3] = {tilt_reading, monitor_reading, keyboard_reading}
+			return preset_positions
 
 	if "calibrate" in payload:
-		#FIXME: need a way to pass the
-		tilt_reading = 0
-		monitor_reading = 0
-		keyboard_reading = 0
+		#FIXME: need a way to calibrate the tilt sensor
+		calibrate_vl53_sensors(sensors)
 
 	if "emergency_stop" in paylaod:
-		#FIXME: immediately stop the commands from running
+		emergency_stop(ser)
 		
 	return sens
-		
-
 
 def call_preset(preset, payload):
 	print(f"\n Moving to {payload}, please wait until movement completed... \n")
@@ -185,8 +193,8 @@ def call_preset(preset, payload):
 def increment_move(preset, payload):
 	"""Move to current location plus one millimeter
 	The plus one below may need to be updated once minimum measurement has been taken"""
-	curr = _read_corrected(sensors, sensor_name)
 	sens = inperpret_payload(payload)
+	curr = _read_corrected(sens, sensor_name)
 	
 	if payload.endswith("_up"):
 		updated = curr + 1 
