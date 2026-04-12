@@ -74,12 +74,12 @@ def load_presets():
                     int(p): {int(m): v for m, v in motors.items()}
                     for p, motors in data.items()
                 }
-            print("Presets loaded from JSON file.")
+            print("✓ Presets loaded from JSON file.")
         except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
-            print(f"Failed to load presets: {e}")
+            print(f"✗ Failed to load presets: {e}")
             print("  Using default preset values.")
     else:
-        print(" No preset file found, using defaults.")
+        print("✓ No preset file found, using defaults.")
 
 
 def save_presets():
@@ -87,9 +87,9 @@ def save_presets():
     try:
         with open(PRESET_FILE, "w") as f:
             json.dump(preset_positions, f, indent=4)
-        print("Presets saved to JSON file.")
+        print("✓ Presets saved to JSON file.")
     except OSError as e:
-        print(f"Failed to save presets: {e}")
+        print(f"✗ Failed to save presets: {e}")
 
 
 ################################################################################
@@ -104,17 +104,17 @@ def update_position(motor_id: int, position: float):
         position = float(position)
         if motor_id == 1:
             current_position_1 = position
-            print(f"M1 position updated: {position}")
+            print(f"  ✓ M1 position updated: {position}")
         elif motor_id == 2:
             current_position_2 = position
-            print(f"M2 position updated: {position}")
+            print(f"  ✓ M2 position updated: {position}")
         elif motor_id == 3:
             current_position_3 = position
-            print(f"M3 position updated: {position}")
+            print(f"  ✓ M3 position updated: {position}")
         else:
-            print(f"Invalid motor ID: {motor_id}")
+            print(f"✗ Invalid motor ID: {motor_id}")
     except ValueError as e:
-        print(f"Invalid position value for M{motor_id}: {position} — {e}")
+        print(f"✗ Invalid position value for M{motor_id}: {position} — {e}")
 
 
 def get_all_positions() -> Dict[int, Optional[float]]:
@@ -141,7 +141,7 @@ def publish_position_feedback(motor_id: int):
             mqtt_client.publish(topic, payload)
             print(f"  → Published: {payload}")
     except Exception as e:
-        print(f"Error publishing feedback for M{motor_id}: {e}")
+        print(f"✗ Error publishing feedback for M{motor_id}: {e}")
 
 
 def publish_all_positions():
@@ -169,12 +169,12 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
     """
     try:
         if direction.lower() == "up":
-            print(f"Motor {motor_id}: EXTEND")
+            print(f"  → Motor {motor_id}: EXTEND")
             # TODO: Add actual motor extension code
             client.publish(TOPIC_STATUS, f"M{motor_id} extending...")
         
         elif direction.lower() == "down":
-            print(f"Motor {motor_id}: RETRACT")
+            print(f"  → Motor {motor_id}: RETRACT")
             # TODO: Add actual motor retraction code
             client.publish(TOPIC_STATUS, f"M{motor_id} retracting...")
         
@@ -182,15 +182,15 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
             # Try to parse as position value
             try:
                 target_mm = float(direction)
-                print(f"Motor {motor_id}: MOVE TO {target_mm} mm")
+                print(f"  → Motor {motor_id}: MOVE TO {target_mm} mm")
                 # TODO: Add motor move to position code
                 client.publish(TOPIC_STATUS, f"M{motor_id} moving to {target_mm}mm...")
             except ValueError:
-                print(f"Invalid direction format: {direction}")
+                print(f"✗ Invalid direction format: {direction}")
                 client.publish(TOPIC_STATUS, f"Invalid direction: {direction}")
     
     except Exception as e:
-        print(f"Error in handle_motor_move: {e}")
+        print(f"✗ Error in handle_motor_move: {e}")
         client.publish(TOPIC_STATUS, f"Error: {e}")
 
 
@@ -207,7 +207,7 @@ def handle_preset_load(client: mqtt.Client, preset_id: int):
     """
     try:
         if preset_id not in preset_positions:
-            print(f"Invalid preset ID: {preset_id}")
+            print(f"✗ Invalid preset ID: {preset_id}")
             client.publish(TOPIC_STATUS, f"Invalid preset: {preset_id}")
             return
         
@@ -215,11 +215,11 @@ def handle_preset_load(client: mqtt.Client, preset_id: int):
         
         # Check if all positions are set
         if None in preset.values():
-            print(f"Preset {preset_id} is not fully configured")
+            print(f"✗ Preset {preset_id} is not fully configured")
             client.publish(TOPIC_STATUS, f"Preset {preset_id} not configured")
             return
         
-        print(f"Loading preset {preset_id}")
+        print(f"  → Loading preset {preset_id}")
         client.publish(TOPIC_STATUS, f"Loading preset {preset_id}...")
         
         # Execute motor movements in sequence
@@ -229,11 +229,11 @@ def handle_preset_load(client: mqtt.Client, preset_id: int):
             # TODO: Add motor move to position code here
             client.publish(TOPIC_STATUS, f"M{motor_id} → {target_pos}mm")
         
-        print(f"Preset {preset_id} complete")
+        print(f"  ✓ Preset {preset_id} complete")
         client.publish(TOPIC_STATUS, f"Preset {preset_id} complete")
     
     except Exception as e:
-        print(f"Error in handle_preset_load: {e}")
+        print(f"✗ Error in handle_preset_load: {e}")
         client.publish(TOPIC_STATUS, f"Preset error: {e}")
 
 
@@ -250,7 +250,7 @@ def handle_preset_save(client: mqtt.Client, preset_id: int):
     """
     try:
         if preset_id not in preset_positions:
-            print(f"Invalid preset ID: {preset_id}")
+            print(f"✗ Invalid preset ID: {preset_id}")
             client.publish(TOPIC_STATUS, f"Invalid preset: {preset_id}")
             return
         
@@ -258,29 +258,29 @@ def handle_preset_save(client: mqtt.Client, preset_id: int):
         
         # Check that all positions are known
         if None in positions.values():
-            print(f"Cannot save preset {preset_id}: not all positions are known")
+            print(f"✗ Cannot save preset {preset_id}: not all positions are known")
             client.publish(TOPIC_STATUS, f"Cannot save preset {preset_id}: positions unknown")
             return
         
         preset_positions[preset_id] = positions.copy()
         save_presets()
         
-        print(f"Preset {preset_id} saved: {positions}")
+        print(f"  ✓ Preset {preset_id} saved: {positions}")
         client.publish(TOPIC_STATUS, f"Preset {preset_id} saved")
     
     except Exception as e:
-        print(f"Error in handle_preset_save: {e}")
+        print(f"✗ Error in handle_preset_save: {e}")
         client.publish(TOPIC_STATUS, f"Save error: {e}")
 
 
 def handle_emergency_stop(client: mqtt.Client):
     """Handle emergency stop command."""
     try:
-        print("////EMERGENCY STOP - All motors disabled////")
+        print("  ⚠ EMERGENCY STOP - All motors disabled")
         client.publish(TOPIC_STATUS, "EMERGENCY STOP")
         # TODO: Add emergency stop code
     except Exception as e:
-        print(f"Error in handle_emergency_stop: {e}")
+        print(f"✗ Error in handle_emergency_stop: {e}")
 
 
 ################################################################################
@@ -294,12 +294,12 @@ def on_connect(client: mqtt.Client, userdata, flags, reason, properties):
     """
     global is_connected
     
-    print(f"Connected to MQTT broker with reason code: {reason}")
+    print(f"✓ Connected to MQTT broker with reason code: {reason}")
     is_connected = True
     
     # Subscribe to command topic
     client.subscribe(TOPIC_COMMAND, 1)
-    print(f"Subscribed to topic: {TOPIC_COMMAND}")
+    print(f"✓ Subscribed to topic: {TOPIC_COMMAND}")
 
 
 def on_message(client: mqtt.Client, userdata, message):
@@ -315,7 +315,7 @@ def on_message(client: mqtt.Client, userdata, message):
         # Heartbeat tracking
         # ────────────────────────────────────────────────────────────────────
         if payload == "Heartbeat":
-            print("Heartbeat received")
+            print("  ♥ Heartbeat received")
             return
         
         # ────────────────────────────────────────────────────────────────────
@@ -330,7 +330,7 @@ def on_message(client: mqtt.Client, userdata, message):
                     try:
                         update_position(motor_id, value_str)
                     except Exception as e:
-                        print(f"Error updating position: {e}")
+                        print(f"✗ Error updating position: {e}")
                     return
         
         # ────────────────────────────────────────────────────────────────────
@@ -349,11 +349,11 @@ def on_message(client: mqtt.Client, userdata, message):
                     if motor_id in [1, 2, 3]:
                         handle_motor_move(client, motor_id, direction_part)
                     else:
-                        print(f"Invalid motor ID: {motor_id}")
+                        print(f"✗ Invalid motor ID: {motor_id}")
                 else:
-                    print(f"Invalid motor format: {motor_part}")
+                    print(f"✗ Invalid motor format: {motor_part}")
             except (IndexError, ValueError) as e:
-                print(f"Error parsing motor command: {e}")
+                print(f"✗ Error parsing motor command: {e}")
             return
         
         # ────────────────────────────────────────────────────────────────────
@@ -369,9 +369,9 @@ def on_message(client: mqtt.Client, userdata, message):
                     preset_id = preset_map[preset_word]
                     handle_preset_load(client, preset_id)
                 else:
-                    print(f"Invalid preset name: {preset_word}")
+                    print(f"✗ Invalid preset name: {preset_word}")
             except Exception as e:
-                print(f"Error parsing preset command: {e}")
+                print(f"✗ Error parsing preset command: {e}")
             return
         
         # ────────────────────────────────────────────────────────────────────
@@ -386,9 +386,9 @@ def on_message(client: mqtt.Client, userdata, message):
                     preset_id = preset_map[preset_word]
                     handle_preset_save(client, preset_id)
                 else:
-                    print(f"Invalid preset name: {preset_word}")
+                    print(f"✗ Invalid preset name: {preset_word}")
             except Exception as e:
-                print(f"Error parsing preset save command: {e}")
+                print(f"✗ Error parsing preset save command: {e}")
             return
         
         # ────────────────────────────────────────────────────────────────────
@@ -398,10 +398,10 @@ def on_message(client: mqtt.Client, userdata, message):
             handle_emergency_stop(client)
             return
         
-        print(f"Unknown MQTT payload: {payload}")
+        print(f"⚠ Unknown MQTT payload: {payload}")
     
     except Exception as e:
-        print(f"Error in on_message callback: {e}")
+        print(f"✗ Error in on_message callback: {e}")
 
 
 def on_disconnect(client: mqtt.Client, userdata, disconnect_flags, reason_code, properties):
@@ -412,7 +412,7 @@ def on_disconnect(client: mqtt.Client, userdata, disconnect_flags, reason_code, 
     global is_connected
     
     is_connected = False
-    print(f"Disconnected from MQTT broker (reason code: {reason_code})")
+    print(f"✗ Disconnected from MQTT broker (reason code: {reason_code})")
 
 
 ################################################################################
@@ -437,11 +437,11 @@ def connect_mqtt():
         mqtt_client.connect(BROKER, PORT)
         mqtt_client.loop_start()
         
-        print(f"MQTT client connecting to {BROKER}:{PORT}...")
+        print(f"✓ MQTT client connecting to {BROKER}:{PORT}...")
         return True
     
     except Exception as e:
-        print(f"Failed to connect to MQTT broker: {e}")
+        print(f"✗ Failed to connect to MQTT broker: {e}")
         return False
 
 
@@ -453,9 +453,9 @@ def disconnect_mqtt():
         if mqtt_client is not None:
             mqtt_client.loop_stop()
             mqtt_client.disconnect()
-            print("MQTT client disconnected")
+            print("✓ MQTT client disconnected")
     except Exception as e:
-        print(f"Error disconnecting MQTT: {e}")
+        print(f"✗ Error disconnecting MQTT: {e}")
 
 
 def publish_status(message: str):
@@ -468,7 +468,7 @@ def publish_status(message: str):
     try:
         mqtt_client.publish(TOPIC_STATUS, message)
     except Exception as e:
-        print(f"Error publishing status: {e}")
+        print(f"✗ Error publishing status: {e}")
 
 
 ################################################################################
@@ -493,7 +493,7 @@ def main():
     if not connect_mqtt():
         return 1
     
-    print("\n MQTT handler started. Publishing heartbeat every", 
+    print("\n✓ MQTT handler started. Publishing heartbeat every", 
           f"{HEARTBEAT_INTERVAL} seconds...\n")
     
     try:
@@ -506,19 +506,29 @@ def main():
                     # Publish current positions
                     publish_all_positions()
                     
-                    print(f"Heartbeat sent, positions updated")
+                    print(f"  → Heartbeat sent, positions updated")
                 
                 time.sleep(HEARTBEAT_INTERVAL)
             
             except Exception as e:
-                print(f"Error in heartbeat loop: {e}")
+                print(f"✗ Error in heartbeat loop: {e}")
                 time.sleep(5)
     
     except KeyboardInterrupt:
-        print("\n\n MQTT handler stopped by user")
+        print("\n\n✓ MQTT handler stopped by user")
     
     finally:
         disconnect_mqtt()
-        print(" MQTT handler shutdown complete")
+        print("✓ MQTT handler shutdown complete")
     
     return 0
+
+
+################################################################################
+#                           ENTRY POINT
+################################################################################
+
+if __name__ == "__main__":
+    import sys
+    exit_code = main()
+    sys.exit(exit_code)

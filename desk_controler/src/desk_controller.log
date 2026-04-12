@@ -1,0 +1,26 @@
+[2026-04-11 07:10:48] [INFO] DeskControllerWrapper initialized
+[2026-04-11 07:10:48] [INFO] Initializing hardware...
+[2026-04-11 07:10:48] [ERROR] Hardware initialization failed: [Errno 5] Input/output error
+[2026-04-11 07:10:48] [INFO] Shutting down controller...
+[2026-04-11 07:10:48] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-11 07:10:48] [ERROR] Error during emergency stop: 'NoneType' object has no attribute 'write'
+[2026-04-11 07:10:48] [INFO] ✓ Shutdown complete
+[2026-04-11 07:13:03] [INFO] DeskControllerWrapper initialized
+[2026-04-11 07:13:03] [INFO] Initializing hardware...
+[2026-04-11 07:13:04] [ERROR] Hardware initialization failed: ADXL345 address check failed after 3 attempts: ADXL345 not found on channel 2 (expected 0x53, found [])
+[2026-04-11 07:13:04] [INFO] Shutting down controller...
+[2026-04-11 07:13:04] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-11 07:13:04] [ERROR] Error during emergency stop: 'NoneType' object has no attribute 'write'
+[2026-04-11 07:13:04] [INFO] ✓ Shutdown complete
+[2026-04-11 07:13:54] [INFO] DeskControllerWrapper initialized
+[2026-04-11 07:13:54] [INFO] Initializing hardware...
+[2026-04-11 07:13:55] [INFO] Calibration data loaded
+[2026-04-11 07:13:55] [INFO] ✓ Hardware initialized successfully
+[2026-04-11 07:13:55] [INFO] No preset file found at desk_presets.json
+[2026-04-11 07:14:00] [ERROR] MQTT connection failed: timed out
+[2026-04-11 07:14:21] [INFO] Starting sensor calibration...
+[2026-04-11 07:14:36] [INFO] ✓ Calibration complete
+[2026-04-11 07:14:48] [INFO] Shutting down controller...
+[2026-04-11 07:14:48] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-11 07:14:48] [INFO] Serial port closed
+[2026-04-11 07:14:48] [INFO] ✓ Shutdown complete
