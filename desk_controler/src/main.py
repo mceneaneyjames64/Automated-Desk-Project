@@ -82,7 +82,7 @@ def get_position_input(motor_id: int) -> float:
 def handle_motor_move(controller: DeskControllerWrapper, motor_id: int):
     """Handle motor movement command."""
     try:
-        target_mm = get_position_input(motor_id)ved: preset_one
+        target_mm = get_position_input(motor_id)
         
         print(f"\n→ Moving motor {motor_id} to {target_mm} mm...")
         if controller.move_motor_to_position(motor_id, target_mm):

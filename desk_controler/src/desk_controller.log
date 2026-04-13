@@ -24,3 +24,91 @@
 [2026-04-11 07:14:48] [WARNING] EMERGENCY STOP - All motors disabled
 [2026-04-11 07:14:48] [INFO] Serial port closed
 [2026-04-11 07:14:48] [INFO] ✓ Shutdown complete
+[2026-04-12 15:53:36] [INFO] DeskControllerWrapper initialized
+[2026-04-12 15:53:36] [INFO] Initializing hardware...
+[2026-04-12 15:53:37] [INFO] Calibration data loaded
+[2026-04-12 15:53:37] [INFO] ✓ Hardware initialized successfully
+[2026-04-12 15:53:37] [INFO] No preset file found at desk_presets.json
+[2026-04-12 15:53:37] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-12 15:53:37] [INFO] Moving motor 1 to 200 mm
+[2026-04-12 15:53:37] [INFO] ✓ MQTT connected (reason code: Success)
+[2026-04-12 15:54:07] [ERROR] ✗ Motor 1 failed to reach 200 mm
+[2026-04-12 15:54:07] [ERROR] Cannot save preset 1: not all positions known
+[2026-04-12 15:54:07] [INFO] Shutting down controller...
+[2026-04-12 15:54:07] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 15:54:08] [WARNING] MQTT disconnected (reason code: Normal disconnection)
+[2026-04-12 15:54:08] [INFO] ✓ MQTT disconnected
+[2026-04-12 15:54:08] [INFO] Serial port closed
+[2026-04-12 15:54:08] [INFO] ✓ Shutdown complete
+[2026-04-12 15:57:43] [INFO] DeskControllerWrapper initialized
+[2026-04-12 15:57:43] [INFO] Initializing hardware...
+[2026-04-12 15:57:44] [INFO] Calibration data loaded
+[2026-04-12 15:57:44] [INFO] ✓ Hardware initialized successfully
+[2026-04-12 15:57:44] [INFO] No preset file found at desk_presets.json
+[2026-04-12 15:57:44] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-12 15:57:44] [INFO] ✓ MQTT connected (reason code: Success)
+[2026-04-12 15:57:55] [INFO] Moving motor 1 to 100.0 mm
+[2026-04-12 15:58:04] [INFO] Shutting down controller...
+[2026-04-12 15:58:04] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 15:58:04] [WARNING] MQTT disconnected (reason code: Normal disconnection)
+[2026-04-12 15:58:04] [INFO] ✓ MQTT disconnected
+[2026-04-12 15:58:04] [INFO] Serial port closed
+[2026-04-12 15:58:04] [INFO] ✓ Shutdown complete
+[2026-04-12 15:58:04] [INFO] Shutting down controller...
+[2026-04-12 15:58:04] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 15:58:04] [ERROR] Error during emergency stop: Attempting to use a port that is not open
+[2026-04-12 15:58:04] [INFO] ✓ Shutdown complete
+[2026-04-12 16:02:38] [INFO] DeskControllerWrapper initialized
+[2026-04-12 16:02:38] [INFO] Initializing hardware...
+[2026-04-12 16:02:39] [INFO] Calibration data loaded
+[2026-04-12 16:02:39] [INFO] ✓ Hardware initialized successfully
+[2026-04-12 16:02:39] [INFO] No preset file found at desk_presets.json
+[2026-04-12 16:02:39] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-12 16:02:39] [INFO] ✓ MQTT connected (reason code: Success)
+[2026-04-12 16:02:42] [INFO] Moving motor 1 to 100.0 mm
+[2026-04-12 16:02:47] [INFO] Shutting down controller...
+[2026-04-12 16:02:47] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 16:02:47] [WARNING] MQTT disconnected (reason code: Normal disconnection)
+[2026-04-12 16:02:47] [INFO] ✓ MQTT disconnected
+[2026-04-12 16:02:47] [INFO] Serial port closed
+[2026-04-12 16:02:47] [INFO] ✓ Shutdown complete
+[2026-04-12 16:02:47] [INFO] Shutting down controller...
+[2026-04-12 16:02:47] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 16:02:47] [ERROR] Error during emergency stop: Attempting to use a port that is not open
+[2026-04-12 16:02:47] [INFO] ✓ Shutdown complete
+[2026-04-12 16:05:50] [INFO] DeskControllerWrapper initialized
+[2026-04-12 16:05:50] [INFO] Initializing hardware...
+[2026-04-12 16:05:50] [INFO] Calibration data loaded
+[2026-04-12 16:05:50] [INFO] ✓ Hardware initialized successfully
+[2026-04-12 16:05:50] [INFO] No preset file found at desk_presets.json
+[2026-04-12 16:05:51] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-12 16:05:51] [INFO] ✓ MQTT connected (reason code: Success)
+[2026-04-12 16:05:54] [INFO] Moving motor 1 to 100.0 mm
+[2026-04-12 16:05:58] [INFO] Shutting down controller...
+[2026-04-12 16:05:58] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 16:05:58] [WARNING] MQTT disconnected (reason code: Normal disconnection)
+[2026-04-12 16:05:58] [INFO] ✓ MQTT disconnected
+[2026-04-12 16:05:58] [INFO] Serial port closed
+[2026-04-12 16:05:58] [INFO] ✓ Shutdown complete
+[2026-04-12 16:05:58] [INFO] Shutting down controller...
+[2026-04-12 16:05:58] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 16:05:58] [ERROR] Error during emergency stop: Attempting to use a port that is not open
+[2026-04-12 16:05:58] [INFO] ✓ Shutdown complete
+[2026-04-12 16:07:42] [INFO] DeskControllerWrapper initialized
+[2026-04-12 16:07:42] [INFO] Initializing hardware...
+[2026-04-12 16:07:43] [INFO] Calibration data loaded
+[2026-04-12 16:07:43] [INFO] ✓ Hardware initialized successfully
+[2026-04-12 16:07:43] [INFO] No preset file found at desk_presets.json
+[2026-04-12 16:07:43] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-12 16:07:43] [INFO] ✓ MQTT connected (reason code: Success)
+[2026-04-12 16:07:47] [INFO] Moving motor 1 to 100.0 mm
+[2026-04-12 16:07:50] [INFO] Shutting down controller...
+[2026-04-12 16:07:50] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 16:07:50] [WARNING] MQTT disconnected (reason code: Normal disconnection)
+[2026-04-12 16:07:50] [INFO] ✓ MQTT disconnected
+[2026-04-12 16:07:50] [INFO] Serial port closed
+[2026-04-12 16:07:50] [INFO] ✓ Shutdown complete
+[2026-04-12 16:07:50] [INFO] Shutting down controller...
+[2026-04-12 16:07:50] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-12 16:07:50] [ERROR] Error during emergency stop: Attempting to use a port that is not open
+[2026-04-12 16:07:50] [INFO] ✓ Shutdown complete

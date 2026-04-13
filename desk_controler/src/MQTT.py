@@ -177,6 +177,10 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
             print(f"  → Motor {motor_id}: RETRACT")
             # TODO: Add actual motor retraction code
             client.publish(TOPIC_STATUS, f"M{motor_id} retracting...")
+        elif direction,lower() == "stop":
+            print(f"  → Motor {motor_id}: STOP")
+            # TODO: Add actual motor retraction code
+            client.publish(TOPIC_STATUS, f"M{motor_id} stoping...")
         
         else:
             # Try to parse as position value
@@ -315,7 +319,7 @@ def on_message(client: mqtt.Client, userdata, message):
         # Heartbeat tracking
         # ────────────────────────────────────────────────────────────────────
         if payload == "Heartbeat":
-            print("  ♥ Heartbeat received")
+            print("Heartbeat received")
             return
         
         # ────────────────────────────────────────────────────────────────────
