@@ -333,6 +333,47 @@ class DeskControllerWrapper:
         except Exception as e:
             self.logger.error(f"Error reading calibrated sensor {sensor_name}: {e}")
             return self.read_sensor_raw(sensor_name)
+            
+            
+    def update_all_motor_positions(self) -> bool:
+        """
+        Read current positions from all sensors and update motor_poitions
+        
+        Returns
+        -------
+        bool
+            True if all positions were successfully read, False otherwise
+        """
+        try:
+            if not self.is_initialized:
+                self.logger.warning("Hardware not initialized")
+                return False
+            
+            self.logger.info("Reading current motor positions from sensors...")
+            
+            # Map motors to sensors
+            motor_sensor_map = {
+                1: config.SENSOR_ADXL
+                2: config.SENSOR_VL53_0
+                3: config.SENSOR_VL53_1
+            }
+            
+            success = True
+            with self.position_lock:
+                for motor_id, sensor_name in motor_sensor_map,items():
+                    position = self.read_sensor_calibrated(sensor_name)
+                    if position is not None:
+                        self.motor_positions[motor_id] = position
+                        self.logger.info(f" M{motor_id}: {position:.1f} mm")
+                    else:
+                        self.logger.warning(f"  M{motor_id}: Failed to read position")
+                        success = False
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error updating motor position: {e}")
+            return False
+            
     
     ################################################################################
     #                           MOTOR CONTROL
@@ -576,10 +617,15 @@ class DeskControllerWrapper:
                 self.logger.error(f"Invalid preset ID: {preset_id}")
                 return False
             
-            # Check that all positions are known
-            with self.position_lock:
+            # Get all positons
+            self.logger.info(f"Reading current positions for preset {preset_id}...")
+            self.update_all_motor_positions()
+            
+            # Check that all poistions are know
+            with self.position_lock;:
                 if None in self.motor_positions.values():
-                    self.logger.error(f"Cannot save preset {preset_id}: not all positions known")
+                    self.logger.error(f"Connot save preset {preset_id}: not all positions known")
+                    self.logger.error(f"    Current positions: {self.motor_positions}")
                     return False
                 
                 self.presets[preset_id] = self.motor_positions.copy()
