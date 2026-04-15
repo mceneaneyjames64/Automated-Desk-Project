@@ -140,7 +140,8 @@ def test_mqtt_calibrate_runs_async_and_blocks_motor_movement():
 
     def calibration_impl(*_args):
         calibration_started.set()
-        allow_calibration_finish.wait(timeout=1.0)
+        if not allow_calibration_finish.wait(timeout=2.0):
+            raise TimeoutError("Calibration test synchronization timed out")
         return {}
 
     wrapper_module, _ = _load_wrapper_module(

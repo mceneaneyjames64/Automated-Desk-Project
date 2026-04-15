@@ -390,16 +390,18 @@ class DeskControllerWrapper:
         finally:
             self.motor_command_lock.release()
     
-    def _start_motor_worker(self, task_name: str, task_fn, *args) -> bool:
-        """Start a worker thread for motor operations."""
-        if (
-            self.system_state == SystemState.CALIBRATING
-            and task_fn in (self.move_motor_to_position, self.retract_motor_fully)
-        ):
-            self.logger.warning("Cannot move motors during calibration")
-            self.publish_status("calibrating")
+    def _reject_if_calibrating(self, publish_status: bool = False) -> bool:
+        """Return True when movement should be rejected due to calibration state."""
+        if self.system_state != SystemState.CALIBRATING:
             return False
 
+        self.logger.warning("Cannot move motors during calibration")
+        if publish_status:
+            self.publish_status("calibrating")
+        return True
+
+    def _start_motor_worker(self, task_name: str, task_fn, *args) -> bool:
+        """Start a worker thread for motor operations."""
         if not self.motor_command_lock.acquire(blocking=False):
             self.logger.warning(f"Ignoring '{task_name}' command: another actuator is moving")
             self.publish_status("busy")
@@ -421,6 +423,12 @@ class DeskControllerWrapper:
             raise
         
         return True
+
+    def _start_motor_movement_worker(self, task_name: str, task_fn, *args) -> bool:
+        """Start a motor movement worker while enforcing calibration interlock."""
+        if self._reject_if_calibrating(publish_status=True):
+            return False
+        return self._start_motor_worker(task_name, task_fn, *args)
 
     def _run_calibration_worker(self) -> bool:
         """Run calibration and publish MQTT status updates."""
@@ -455,8 +463,7 @@ class DeskControllerWrapper:
                 self.logger.warning("Hardware not initialized")
                 return False
 
-            if self.system_state == SystemState.CALIBRATING:
-                self.logger.warning("Cannot move motors during calibration")
+            if self._reject_if_calibrating():
                 return False
             
             if motor_id not in [1, 2, 3]:
@@ -545,8 +552,7 @@ class DeskControllerWrapper:
                 self.logger.warning("Hardware not initialized")
                 return False
 
-            if self.system_state == SystemState.CALIBRATING:
-                self.logger.warning("Cannot move motors during calibration")
+            if self._reject_if_calibrating():
                 return False
             
             if motor_id not in [1, 2, 3]:
@@ -906,14 +912,14 @@ class DeskControllerWrapper:
                     
                     if direction_part.lower() == "up":
                         target = self._motor_max_target(motor_id)
-                        self._start_motor_worker(
+                        self._start_motor_movement_worker(
                             f"m{motor_id}-up",
                             self.move_motor_to_position,
                             motor_id,
                             target
                         )
                     elif direction_part.lower() == "down":
-                        self._start_motor_worker(
+                        self._start_motor_movement_worker(
                             f"m{motor_id}-down",
                             self.retract_motor_fully,
                             motor_id
@@ -922,7 +928,7 @@ class DeskControllerWrapper:
                         self.emergency_stop_all()
                     else:
                         target_pos = float(direction_part)
-                        self._start_motor_worker(
+                        self._start_motor_movement_worker(
                             f"m{motor_id}-move",
                             self.move_motor_to_position,
                             motor_id,
