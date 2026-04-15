@@ -395,7 +395,7 @@ class DeskControllerWrapper:
         
         return True
     
-    def move_motor_to_position(self, motor_id: int, target_mm: float,
+    def move_motor_to_position(self, motor_id: int, target_value: float,
                                tolerance: int = 2, timeout: float = 30) -> bool:
         """
         Move a motor to a specific position.
@@ -404,8 +404,8 @@ class DeskControllerWrapper:
         ----------
         motor_id : int
             Motor ID (1-3)
-        target_mm : float
-            Target position in millimeters
+        target_value : float
+            Target value (degrees for M1, millimeters for M2/M3)
         tolerance : int
             Acceptable error in mm
         timeout : float
@@ -425,7 +425,8 @@ class DeskControllerWrapper:
                 self.logger.error(f"Invalid motor ID: {motor_id}")
                 return False
             
-            self.logger.info(f"Moving motor {motor_id} to {target_mm} mm")
+            unit = "deg" if motor_id == 1 else "mm"
+            self.logger.info(f"Moving motor {motor_id} to {target_value} {unit}")
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
             
@@ -433,7 +434,7 @@ class DeskControllerWrapper:
             if motor_id == 1:
                 success = move_to_angle(
                     self.sensors,
-                    target_mm,
+                    target_value,
                     serial_port,
                     tolerance=tolerance,
                     timeout=timeout,
@@ -449,7 +450,7 @@ class DeskControllerWrapper:
                 success = move_to_distance(
                     self.sensors,
                     sensor_name,
-                    target_mm,
+                    target_value,
                     serial_port,
                     tolerance=tolerance,
                     timeout=timeout,
@@ -457,9 +458,9 @@ class DeskControllerWrapper:
             
             if success:
                 with self.position_lock:
-                    self.motor_positions[motor_id] = target_mm
+                    self.motor_positions[motor_id] = target_value
                 self.motor_status[motor_id] = "idle"
-                self.logger.info(f"✓ Motor {motor_id} reached {target_mm} mm")
+                self.logger.info(f"✓ Motor {motor_id} reached {target_value} {unit}")
                 
                 # Publish feedback
                 self.publish_position_feedback(motor_id)
@@ -472,7 +473,7 @@ class DeskControllerWrapper:
             else:
                 self.motor_status[motor_id] = "error"
                 self.system_state = SystemState.ERROR
-                self.logger.error(f"✗ Motor {motor_id} failed to reach {target_mm} mm")
+                self.logger.error(f"✗ Motor {motor_id} failed to reach {target_value} {unit}")
                 return False
         
         except InterruptedError:
