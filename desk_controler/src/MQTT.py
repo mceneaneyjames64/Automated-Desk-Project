@@ -60,6 +60,7 @@ is_connected = False
 # Optional hardware context for command handlers
 motor_serial_port: Optional[Any] = None   # Serial connection used by stop and emergency_stop handlers
 calibration_sensors: Optional[Dict[str, Any]] = None  # Sensors used by calibration
+motor_sensors: Optional[Dict[str, Any]] = None  # Sensors used by motor movement commands
 
 
 ################################################################################
@@ -173,18 +174,30 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
         "up", "down", or numeric position value
     """
     try:
+        sensor_name = {
+            1: config.SENSOR_ADXL,
+            2: config.SENSOR_VL53_0,
+            3: config.SENSOR_VL53_1,
+        }.get(motor_id)
+        if sensor_name is None:
+            raise ValueError(f"Invalid motor ID: {motor_id}")
+
+        sensors = _require_motor_sensors(f"motor M{motor_id} move")
+        ser = _require_motor_serial_port(f"motor M{motor_id} move")
+
         if direction.lower() == "up":
             print(f"  → Motor {motor_id}: EXTEND")
-            # TODO: Add actual motor extension code
+            target = config.MAX_ANGLE_DEG if motor_id == 1 else config.MAX_POSITION
+            move_to_distance(sensors, sensor_name, target, ser)
             client.publish(TOPIC_STATUS, f"M{motor_id} extending...")
         
         elif direction.lower() == "down":
             print(f"  → Motor {motor_id}: RETRACT")
-            # TODO: Add actual motor retraction code
+            retract_fully(sensors, sensor_name, ser)
             client.publish(TOPIC_STATUS, f"M{motor_id} retracting...")
         elif direction.lower() == "stop":
             print(f"  → Motor {motor_id}: STOP")
-            # TODO: Add actual motor retraction code
+            stop(ser)
             client.publish(TOPIC_STATUS, f"M{motor_id} stopping...")
         
         else:
@@ -192,7 +205,7 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
             try:
                 target_mm = float(direction)
                 print(f"  → Motor {motor_id}: MOVE TO {target_mm} mm")
-                # TODO: Add motor move to position code
+                move_to_distance(sensors, sensor_name, target_mm, ser)
                 client.publish(TOPIC_STATUS, f"M{motor_id} moving to {target_mm}mm...")
             except ValueError:
                 print(f"✗ Invalid direction format: {direction}")
@@ -326,6 +339,17 @@ def _require_motor_serial_port(command_name: str):
             f"Set MQTT.motor_serial_port before processing {command_name} commands."
         )
     return motor_serial_port
+
+
+def _require_motor_sensors(command_name: str):
+    """Return configured sensors dict for motor commands."""
+    sensors = motor_sensors if motor_sensors is not None else calibration_sensors
+    if sensors is None:
+        raise RuntimeError(
+            "Motor sensors not initialized. "
+            f"Set MQTT.motor_sensors (or MQTT.calibration_sensors) before processing {command_name} commands."
+        )
+    return sensors
 
 
 ################################################################################

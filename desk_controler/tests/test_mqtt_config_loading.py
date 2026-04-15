@@ -25,8 +25,8 @@ def _install_mqtt_stubs():
     sys.modules["paho.mqtt.client"] = paho_mqtt_client
 
     fake_motor_control = types.ModuleType("motor_control")
-    fake_motor_control.move_to_distance = lambda *_args, **_kwargs: True
-    fake_motor_control.retract_fully = lambda *_args, **_kwargs: True
+    fake_motor_control.move_to_distance = Mock(return_value=True)
+    fake_motor_control.retract_fully = Mock(return_value=True)
     fake_motor_control.emergency_stop = Mock()
     fake_motor_control.stop = Mock()
     sys.modules["motor_control"] = fake_motor_control
@@ -114,3 +114,60 @@ def test_calibrate_payload_runs_calibration_script():
 
     fake_calibration.calibrate_vl53_sensors.assert_called_once_with(mqtt_module.calibration_sensors)
     client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "Calibration complete")
+
+
+def test_m2_down_payload_calls_retract_fully_with_vl53_sensor():
+    mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
+
+    sensors = {"vl53l0x_0": object()}
+    mqtt_module.motor_sensors = sensors
+    mqtt_module.motor_serial_port = object()
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"m2 -> down")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_motor_control.retract_fully.assert_called_once_with(
+        sensors, mqtt_module.config.SENSOR_VL53_0, mqtt_module.motor_serial_port
+    )
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "M2 retracting...")
+
+
+def test_m2_up_payload_calls_move_to_distance_with_max_position():
+    mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
+
+    sensors = {"vl53l0x_0": object()}
+    mqtt_module.motor_sensors = sensors
+    mqtt_module.motor_serial_port = object()
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"m2 -> up")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_motor_control.move_to_distance.assert_called_once_with(
+        sensors,
+        mqtt_module.config.SENSOR_VL53_0,
+        mqtt_module.config.MAX_POSITION,
+        mqtt_module.motor_serial_port,
+    )
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "M2 extending...")
+
+
+def test_m2_numeric_payload_calls_move_to_distance_with_requested_position():
+    mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
+
+    sensors = {"vl53l0x_0": object()}
+    mqtt_module.motor_sensors = sensors
+    mqtt_module.motor_serial_port = object()
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"m2 -> 123.4")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_motor_control.move_to_distance.assert_called_once_with(
+        sensors,
+        mqtt_module.config.SENSOR_VL53_0,
+        123.4,
+        mqtt_module.motor_serial_port,
+    )
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "M2 moving to 123.4mm...")
