@@ -35,6 +35,16 @@ PASSWORD = config.MQTT_PASSWORD
 
 PRESET_FILE = config.MQTT_PRESET_FILE
 HEARTBEAT_INTERVAL = config.MQTT_HEARTBEAT_INTERVAL
+MOTOR_SENSOR_MAP = {
+    1: config.SENSOR_ADXL,
+    2: config.SENSOR_VL53_0,
+    3: config.SENSOR_VL53_1,
+}
+MOTOR_MAX_TARGET_MAP = {
+    1: config.MAX_ANGLE_DEG,
+    2: config.MAX_POSITION,
+    3: config.MAX_POSITION,
+}
 
 
 ################################################################################
@@ -174,31 +184,33 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
         "up", "down", or numeric position value
     """
     try:
-        sensor_name = {
-            1: config.SENSOR_ADXL,
-            2: config.SENSOR_VL53_0,
-            3: config.SENSOR_VL53_1,
-        }.get(motor_id)
+        direction_lower = direction.lower()
+        if direction_lower == "stop":
+            print(f"  → Motor {motor_id}: STOP")
+            stop(_require_motor_serial_port(f"motor M{motor_id} stop"))
+            client.publish(TOPIC_STATUS, f"M{motor_id} stopping...")
+            return
+
+        sensor_name = MOTOR_SENSOR_MAP.get(motor_id)
         if sensor_name is None:
-            raise ValueError(f"Invalid motor ID: {motor_id}")
+            raise ValueError(
+                f"Invalid motor ID: {motor_id}. "
+                f"Valid IDs are: {list(MOTOR_SENSOR_MAP.keys())}"
+            )
 
         sensors = _require_motor_sensors(f"motor M{motor_id} move")
         ser = _require_motor_serial_port(f"motor M{motor_id} move")
 
-        if direction.lower() == "up":
+        if direction_lower == "up":
             print(f"  → Motor {motor_id}: EXTEND")
-            target = config.MAX_ANGLE_DEG if motor_id == 1 else config.MAX_POSITION
+            target = MOTOR_MAX_TARGET_MAP[motor_id]
             move_to_distance(sensors, sensor_name, target, ser)
             client.publish(TOPIC_STATUS, f"M{motor_id} extending...")
         
-        elif direction.lower() == "down":
+        elif direction_lower == "down":
             print(f"  → Motor {motor_id}: RETRACT")
             retract_fully(sensors, sensor_name, ser)
             client.publish(TOPIC_STATUS, f"M{motor_id} retracting...")
-        elif direction.lower() == "stop":
-            print(f"  → Motor {motor_id}: STOP")
-            stop(ser)
-            client.publish(TOPIC_STATUS, f"M{motor_id} stopping...")
         
         else:
             # Try to parse as position value
@@ -342,7 +354,11 @@ def _require_motor_serial_port(command_name: str):
 
 
 def _require_motor_sensors(command_name: str):
-    """Return configured sensors dict for motor commands."""
+    """Return configured sensors dict for motor commands.
+
+    Falls back to calibration_sensors for backwards compatibility with existing
+    integrations that already provide that shared sensor dictionary.
+    """
     sensors = motor_sensors if motor_sensors is not None else calibration_sensors
     if sensors is None:
         raise RuntimeError(

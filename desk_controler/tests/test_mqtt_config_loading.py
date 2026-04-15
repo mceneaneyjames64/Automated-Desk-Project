@@ -171,3 +171,18 @@ def test_m2_numeric_payload_calls_move_to_distance_with_requested_position():
         mqtt_module.motor_serial_port,
     )
     client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "M2 moving to 123.4mm...")
+
+
+def test_motor_stop_payload_does_not_require_motor_sensors():
+    mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
+
+    mqtt_module.motor_sensors = None
+    mqtt_module.calibration_sensors = None
+    mqtt_module.motor_serial_port = object()
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"m2 -> stop")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_motor_control.stop.assert_called_once_with(mqtt_module.motor_serial_port)
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "M2 stopping...")
