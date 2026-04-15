@@ -24,16 +24,16 @@ from motor_control import move_to_distance, retract_fully, emergency_stop
 #                           MQTT CONFIGURATION
 ################################################################################
 
-BROKER = "192.168.1.138"
-PORT = 1883
-TOPIC_COMMAND = "home/desk/command"
-TOPIC_STATUS = "home/desk/status"
-TOPIC_FEEDBACK = "home/desk/feedback"
-USERNAME = "mqtttest"
-PASSWORD = "VMIececapstone"
+BROKER = config.MQTT_BROKER
+PORT = config.MQTT_PORT
+TOPIC_COMMAND = config.MQTT_TOPIC_COMMAND
+TOPIC_STATUS = config.MQTT_TOPIC_STATUS
+TOPIC_FEEDBACK = config.MQTT_TOPIC_FEEDBACK
+USERNAME = config.MQTT_USERNAME
+PASSWORD = config.MQTT_PASSWORD
 
-PRESET_FILE = "desk_presets.json"
-HEARTBEAT_INTERVAL = 60  # seconds
+PRESET_FILE = config.MQTT_PRESET_FILE
+HEARTBEAT_INTERVAL = config.MQTT_HEARTBEAT_INTERVAL
 
 
 ################################################################################
@@ -177,10 +177,10 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
             print(f"  → Motor {motor_id}: RETRACT")
             # TODO: Add actual motor retraction code
             client.publish(TOPIC_STATUS, f"M{motor_id} retracting...")
-        elif direction,lower() == "stop":
+        elif direction.lower() == "stop":
             print(f"  → Motor {motor_id}: STOP")
             # TODO: Add actual motor retraction code
-            client.publish(TOPIC_STATUS, f"M{motor_id} stoping...")
+            client.publish(TOPIC_STATUS, f"M{motor_id} stopping...")
         
         else:
             # Try to parse as position value
