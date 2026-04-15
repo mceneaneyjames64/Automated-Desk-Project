@@ -205,7 +205,7 @@ class DeskControllerWrapper:
         self.serial_port = None
         self.is_initialized = False
         
-        # Motor state
+        # Motor state (M1 stores angle degrees, M2/M3 store distance millimetres)
         self.motor_positions = {1: None, 2: None, 3: None}
         self.motor_status = {1: "idle", 2: "idle", 3: "idle"}
         self.system_state = SystemState.IDLE
@@ -361,6 +361,18 @@ class DeskControllerWrapper:
     ################################################################################
     #                           MOTOR CONTROL
     ################################################################################
+
+    def _motor_unit(self, motor_id: int) -> str:
+        """Return display/storage unit for a motor target/position."""
+        return "deg" if motor_id == 1 else "mm"
+
+    def _motor_max_target(self, motor_id: int) -> float:
+        """Return maximum allowed target for motor_id in its native unit."""
+        return config.MAX_ANGLE_DEG if motor_id == 1 else config.MAX_POSITION
+
+    def _motor_min_target(self, motor_id: int) -> float:
+        """Return minimum allowed target for motor_id in its native unit."""
+        return config.MIN_ANGLE_DEG if motor_id == 1 else config.MIN_POSITION
     
     def _run_motor_worker(self, task_name: str, task_fn, *args):
         """Run motor operation in a background worker thread."""
@@ -425,7 +437,7 @@ class DeskControllerWrapper:
                 self.logger.error(f"Invalid motor ID: {motor_id}")
                 return False
             
-            unit = "deg" if motor_id == 1 else "mm"
+            unit = self._motor_unit(motor_id)
             self.logger.info(f"Moving motor {motor_id} to {target_value} {unit}")
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
@@ -533,9 +545,7 @@ class DeskControllerWrapper:
             
             if success:
                 with self.position_lock:
-                    self.motor_positions[motor_id] = (
-                        config.MIN_ANGLE_DEG if motor_id == 1 else config.MIN_POSITION
-                    )
+                    self.motor_positions[motor_id] = self._motor_min_target(motor_id)
                 self.motor_status[motor_id] = "idle"
                 self.logger.info(f"✓ Motor {motor_id} fully retracted")
                 
@@ -871,7 +881,7 @@ class DeskControllerWrapper:
                     motor_id = int(motor_part[1:])
                     
                     if direction_part.lower() == "up":
-                        target = config.MAX_ANGLE_DEG if motor_id == 1 else config.MAX_POSITION
+                        target = self._motor_max_target(motor_id)
                         self._start_motor_worker(
                             f"m{motor_id}-up",
                             self.move_motor_to_position,
@@ -1036,7 +1046,10 @@ class DeskControllerWrapper:
         print(f"\nMotor Positions:")
         for motor_id, position in status['motor_positions'].items():
             status_str = status['motor_status'].get(motor_id, "unknown")
-            pos_str = f"{position:.1f} mm" if position is not None else "unknown"
+            pos_str = (
+                f"{position:.1f} {self._motor_unit(motor_id)}"
+                if position is not None else "unknown"
+            )
             print(f"  M{motor_id}: {pos_str:15} [{status_str}]")
         print(f"\nTimestamp:        {status['timestamp']}")
         print("="*60 + "\n")
