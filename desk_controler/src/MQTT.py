@@ -159,49 +159,6 @@ def publish_all_positions():
 #                           COMMAND HANDLERS
 ################################################################################
 
-def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
-    """
-    Handle motor movement command.
-    
-    Parameters
-    ----------
-    client : mqtt.Client
-        MQTT client
-    motor_id : int
-        Motor ID (1-3)
-    direction : str
-        "up", "down", or numeric position value
-    """
-    try:
-        if direction.lower() == "up":
-            print(f"  → Motor {motor_id}: EXTEND")
-            # TODO: Add actual motor extension code
-            client.publish(TOPIC_STATUS, f"M{motor_id} extending...")
-        
-        elif direction.lower() == "down":
-            print(f"  → Motor {motor_id}: RETRACT")
-            # TODO: Add actual motor retraction code
-            client.publish(TOPIC_STATUS, f"M{motor_id} retracting...")
-        elif direction.lower() == "stop":
-            print(f"  → Motor {motor_id}: STOP")
-            # TODO: Add actual motor retraction code
-            client.publish(TOPIC_STATUS, f"M{motor_id} stopping...")
-        
-        else:
-            # Try to parse as position value
-            try:
-                target_mm = float(direction)
-                print(f"  → Motor {motor_id}: MOVE TO {target_mm} mm")
-                # TODO: Add motor move to position code
-                client.publish(TOPIC_STATUS, f"M{motor_id} moving to {target_mm}mm...")
-            except ValueError:
-                print(f"✗ Invalid direction format: {direction}")
-                client.publish(TOPIC_STATUS, f"Invalid direction: {direction}")
-    
-    except Exception as e:
-        print(f"✗ Error in handle_motor_move: {e}")
-        client.publish(TOPIC_STATUS, f"Error: {e}")
-
 
 def handle_preset_load(client: mqtt.Client, preset_id: int):
     """
