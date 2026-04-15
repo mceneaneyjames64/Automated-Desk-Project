@@ -14,7 +14,7 @@ import paho.mqtt.client as mqtt
 import time
 import json
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import config
 from calibration import calibrate_vl53_sensors
@@ -58,8 +58,8 @@ mqtt_client = None
 is_connected = False
 
 # Optional hardware context for command handlers
-motor_serial = None
-motor_sensors = None
+motor_serial_port: Optional[Any] = None   # Serial connection used by stop and emergency_stop handlers
+calibration_sensors: Optional[Dict[str, Any]] = None  # Sensors used by calibration
 
 
 ################################################################################
@@ -287,9 +287,7 @@ def handle_emergency_stop(client: mqtt.Client):
     try:
         print("  ⚠ EMERGENCY STOP - All motors disabled")
         client.publish(TOPIC_STATUS, "EMERGENCY STOP")
-        if motor_serial is None:
-            raise RuntimeError("No serial port configured for emergency stop")
-        emergency_stop(motor_serial)
+        emergency_stop(_require_motor_serial_port("emergency stop"))
     except Exception as e:
         print(f"✗ Error in handle_emergency_stop: {e}")
 
@@ -299,9 +297,7 @@ def handle_stop(client: mqtt.Client):
     try:
         print("  → STOP - Gracefully halting motors")
         client.publish(TOPIC_STATUS, "STOP")
-        if motor_serial is None:
-            raise RuntimeError("No serial port configured for stop")
-        stop(motor_serial)
+        stop(_require_motor_serial_port("stop"))
     except Exception as e:
         print(f"✗ Error in handle_stop: {e}")
 
@@ -310,13 +306,26 @@ def handle_calibration(client: mqtt.Client):
     """Handle calibration command."""
     try:
         print("  → Running calibration routine")
-        client.publish(TOPIC_STATUS, "Running calibration...")
-        if motor_sensors is None:
-            raise RuntimeError("No sensors configured for calibration")
-        calibrate_vl53_sensors(motor_sensors)
+        if calibration_sensors is None:
+            raise RuntimeError(
+                "Calibration sensors not initialized. "
+                "Set MQTT.calibration_sensors before processing calibrate commands."
+            )
+        client.publish(TOPIC_STATUS, "Starting calibration")
+        calibrate_vl53_sensors(calibration_sensors)
         client.publish(TOPIC_STATUS, "Calibration complete")
     except Exception as e:
         print(f"✗ Error in handle_calibration: {e}")
+
+
+def _require_motor_serial_port(command_name: str):
+    """Return configured motor serial port or raise a helpful error."""
+    if motor_serial_port is None:
+        raise RuntimeError(
+            "Motor serial port not initialized. "
+            f"Set MQTT.motor_serial_port before processing {command_name} commands."
+        )
+    return motor_serial_port
 
 
 ################################################################################

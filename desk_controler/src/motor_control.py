@@ -159,11 +159,19 @@ def retract_fully(sensors: dict, sensor_name: str,
 
 def emergency_stop(ser) -> None:
     """Send an immediate stop command to all motors."""
-    ser.write(config.CMD_ALL_OFF)
-    print("[motor] EMERGENCY STOP — all motors disabled.")
+    _send_all_off(ser, "[motor] EMERGENCY STOP — all motors disabled.")
 
 
 def stop(ser) -> None:
-    """Send a normal stop command to all motors."""
+    """Send a normal stop command to all motors.
+
+    This intentionally sends the same hardware command as emergency_stop.
+    The only difference in this module is logging/message semantics.
+    """
+    _send_all_off(ser, "[motor] Stop requested — all motors halted.")
+
+
+def _send_all_off(ser, message: str) -> None:
+    """Send the all-off command and emit a status message."""
     ser.write(config.CMD_ALL_OFF)
-    print("[motor] Stop requested — all motors halted.")
+    print(message)
