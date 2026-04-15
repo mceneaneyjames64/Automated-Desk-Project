@@ -392,6 +392,14 @@ class DeskControllerWrapper:
     
     def _start_motor_worker(self, task_name: str, task_fn, *args) -> bool:
         """Start a worker thread for motor operations."""
+        if (
+            self.system_state == SystemState.CALIBRATING
+            and task_fn in (self.move_motor_to_position, self.retract_motor_fully)
+        ):
+            self.logger.warning("Cannot move motors during calibration")
+            self.publish_status("calibrating")
+            return False
+
         if not self.motor_command_lock.acquire(blocking=False):
             self.logger.warning(f"Ignoring '{task_name}' command: another actuator is moving")
             self.publish_status("busy")
@@ -413,6 +421,13 @@ class DeskControllerWrapper:
             raise
         
         return True
+
+    def _run_calibration_worker(self) -> bool:
+        """Run calibration and publish MQTT status updates."""
+        self.publish_status("Starting calibration")
+        success = self.run_calibration()
+        self.publish_status("Calibration complete" if success else "Calibration failed")
+        return success
     
     def move_motor_to_position(self, motor_id: int, target_value: float,
                                tolerance: int = 2, timeout: float = 30) -> bool:
@@ -438,6 +453,10 @@ class DeskControllerWrapper:
         try:
             if not self.is_initialized:
                 self.logger.warning("Hardware not initialized")
+                return False
+
+            if self.system_state == SystemState.CALIBRATING:
+                self.logger.warning("Cannot move motors during calibration")
                 return False
             
             if motor_id not in [1, 2, 3]:
@@ -524,6 +543,10 @@ class DeskControllerWrapper:
         try:
             if not self.is_initialized:
                 self.logger.warning("Hardware not initialized")
+                return False
+
+            if self.system_state == SystemState.CALIBRATING:
+                self.logger.warning("Cannot move motors during calibration")
                 return False
             
             if motor_id not in [1, 2, 3]:
@@ -928,6 +951,12 @@ class DeskControllerWrapper:
             
             elif payload == "emergency_stop":
                 self.emergency_stop_all()
+
+            elif payload == "calibrate":
+                self._start_motor_worker(
+                    "calibrate",
+                    self._run_calibration_worker,
+                )
         
         except Exception as e:
             self.logger.error(f"Error processing MQTT message: {e}")
