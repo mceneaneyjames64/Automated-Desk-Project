@@ -67,9 +67,12 @@ class DeskControllerService:
                 print("✓ MQTT connected")
             
             self.running = True
+            self.controller.publish_status("service_running")
+            
             print("\n[Service] Status: RUNNING")
             print("[Service] Listening for MQTT commands...")
             print("[Service] Publishing heartbeat every 60 seconds\n")
+            
             
             # Start heartbeat thread
             self.heartbeat_thread = threading.Thread(
@@ -115,6 +118,8 @@ class DeskControllerService:
     def stop(self):
         """Stop the service gracefully."""
         print("\n[Service] Stopping...")
+        
+        self.controller.publish_status("service_stopped")
         self.running = False
         
         if self.heartbeat_thread:
