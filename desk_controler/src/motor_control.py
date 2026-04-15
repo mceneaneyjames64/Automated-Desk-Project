@@ -133,7 +133,7 @@ def move_to_distance(sensors: dict, sensor_name: str, target_mm: float,
 def retract_fully(sensors: dict, sensor_name: str,
                   ser, timeout: float = 30) -> bool:
     """
-    Drive an actuator to config.MIN_POSITION using corrected sensor readings.
+    Drive an actuator to config.MIN_POSITION using raw sensor readings.
 
     Parameters
     ----------
@@ -157,7 +157,7 @@ def retract_fully(sensors: dict, sensor_name: str,
     start_time = time.monotonic()
 
     while time.monotonic() - start_time < timeout:
-        current_mm = _read_corrected(sensors, sensor_name)
+        current_mm = get_sensor_value(sensors, sensor_name)
 
         if current_mm <= config.MIN_POSITION:
             ser.write(config.CMD_ALL_OFF)
