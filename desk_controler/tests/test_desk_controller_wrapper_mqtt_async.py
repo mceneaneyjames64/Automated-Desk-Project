@@ -28,7 +28,22 @@ def _load_wrapper_module(move_impl, retract_impl):
 
     fake_motor_control = types.ModuleType("motor_control")
     fake_motor_control.move_to_distance = move_impl
+    fake_motor_control.move_to_angle = (
+        lambda sensors, target_deg, serial_port, tolerance=1.0, timeout=30:
+        move_impl(
+            sensors,
+            "adxl345",
+            target_deg,
+            serial_port,
+            tolerance=tolerance,
+            timeout=timeout,
+        )
+    )
     fake_motor_control.retract_fully = retract_impl
+    fake_motor_control.retract_tilt = (
+        lambda sensors, serial_port, timeout=30:
+        retract_impl(sensors, "adxl345", serial_port, timeout=timeout)
+    )
     fake_motor_control.emergency_stop = Mock()
 
     fake_calibration = types.ModuleType("calibration")
