@@ -17,7 +17,8 @@ import os
 from typing import Dict, Optional
 
 import config
-from motor_control import move_to_distance, retract_fully, emergency_stop
+from calibration import calibrate_vl53_sensors
+from motor_control import move_to_distance, retract_fully, emergency_stop, stop
 
 
 ################################################################################
@@ -55,6 +56,10 @@ preset_positions = {
 # State flags
 mqtt_client = None
 is_connected = False
+
+# Optional hardware context for command handlers
+motor_serial = None
+motor_sensors = None
 
 
 ################################################################################
@@ -282,9 +287,36 @@ def handle_emergency_stop(client: mqtt.Client):
     try:
         print("  ⚠ EMERGENCY STOP - All motors disabled")
         client.publish(TOPIC_STATUS, "EMERGENCY STOP")
-        # TODO: Add emergency stop code
+        if motor_serial is None:
+            raise RuntimeError("No serial port configured for emergency stop")
+        emergency_stop(motor_serial)
     except Exception as e:
         print(f"✗ Error in handle_emergency_stop: {e}")
+
+
+def handle_stop(client: mqtt.Client):
+    """Handle normal stop command."""
+    try:
+        print("  → STOP - Gracefully halting motors")
+        client.publish(TOPIC_STATUS, "STOP")
+        if motor_serial is None:
+            raise RuntimeError("No serial port configured for stop")
+        stop(motor_serial)
+    except Exception as e:
+        print(f"✗ Error in handle_stop: {e}")
+
+
+def handle_calibration(client: mqtt.Client):
+    """Handle calibration command."""
+    try:
+        print("  → Running calibration routine")
+        client.publish(TOPIC_STATUS, "Running calibration...")
+        if motor_sensors is None:
+            raise RuntimeError("No sensors configured for calibration")
+        calibrate_vl53_sensors(motor_sensors)
+        client.publish(TOPIC_STATUS, "Calibration complete")
+    except Exception as e:
+        print(f"✗ Error in handle_calibration: {e}")
 
 
 ################################################################################
@@ -400,6 +432,20 @@ def on_message(client: mqtt.Client, userdata, message):
         # ────────────────────────────────────────────────────────────────────
         if payload == "emergency_stop":
             handle_emergency_stop(client)
+            return
+
+        # ────────────────────────────────────────────────────────────────────
+        # Normal stop
+        # ────────────────────────────────────────────────────────────────────
+        if payload == "stop":
+            handle_stop(client)
+            return
+
+        # ────────────────────────────────────────────────────────────────────
+        # Calibration
+        # ────────────────────────────────────────────────────────────────────
+        if payload == "calibrate":
+            handle_calibration(client)
             return
         
         print(f"⚠ Unknown MQTT payload: {payload}")

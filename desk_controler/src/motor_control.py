@@ -161,3 +161,9 @@ def emergency_stop(ser) -> None:
     """Send an immediate stop command to all motors."""
     ser.write(config.CMD_ALL_OFF)
     print("[motor] EMERGENCY STOP — all motors disabled.")
+
+
+def stop(ser) -> None:
+    """Send a normal stop command to all motors."""
+    ser.write(config.CMD_ALL_OFF)
+    print("[motor] Stop requested — all motors halted.")
