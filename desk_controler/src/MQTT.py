@@ -180,7 +180,7 @@ def handle_motor_move(client: mqtt.Client, motor_id: int, direction: str):
         elif direction.lower() == "stop":
             print(f"  → Motor {motor_id}: STOP")
             # TODO: Add actual motor retraction code
-            client.publish(TOPIC_STATUS, f"M{motor_id} stoping...")
+            client.publish(TOPIC_STATUS, f"M{motor_id} stopping...")
         
         else:
             # Try to parse as position value
