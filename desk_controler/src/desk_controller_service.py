@@ -10,6 +10,7 @@ import sys
 import time
 import signal
 import threading
+import config
 from desk_controller_wrapper import DeskControllerWrapper
 
 
@@ -38,10 +39,10 @@ class DeskControllerService:
         try:
             # Create controller
             self.controller = DeskControllerWrapper(
-                broker="192.168.1.138",
-                mqtt_port=1883,
-                mqtt_username="mqtttest",
-                mqtt_password="VMIececapstone",
+                broker=config.MQTT_BROKER,
+                mqtt_port=config.MQTT_PORT,
+                mqtt_username=config.MQTT_USERNAME,
+                mqtt_password=config.MQTT_PASSWORD,
                 presets_file="desk_presets.json",
                 log_file="/var/log/desk_controller.log"
             )

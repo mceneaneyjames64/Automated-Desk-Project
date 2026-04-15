@@ -158,10 +158,10 @@ class DeskControllerWrapper:
     """
     
     def __init__(self, 
-                 broker: str = "192.168.1.138",
-                 mqtt_port: int = 1883,
-                 mqtt_username: str = "mqtttest",
-                 mqtt_password: str = "VMIececapstone",
+                 broker: str = config.MQTT_BROKER,
+                 mqtt_port: int = config.MQTT_PORT,
+                 mqtt_username: str = config.MQTT_USERNAME,
+                 mqtt_password: str = config.MQTT_PASSWORD,
                  mqtt_command_topic: str = "home/desk/command",
                  mqtt_status_topic: str = "home/desk/status",
                  mqtt_feedback_topic: str = "home/desk/feedback",

@@ -58,8 +58,8 @@ MQTT_PORT = 1883
 MQTT_TOPIC_COMMAND = "home/desk/command"
 MQTT_TOPIC_STATUS = "home/desk/status"
 MQTT_TOPIC_FEEDBACK = "home/desk/feedback"
-MQTT_USERNAME = "mqtttest"
-MQTT_PASSWORD = "VMIececapstone"
+MQTT_USERNAME = "eceMos"
+MQTT_PASSWORD = "eceMos1"
 MQTT_PRESET_FILE = "desk_presets.json"
 MQTT_HEARTBEAT_INTERVAL = 60  # seconds
 
