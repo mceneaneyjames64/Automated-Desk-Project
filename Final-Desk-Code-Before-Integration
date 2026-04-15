@@ -23,6 +23,9 @@ preset_positions = {
     3: {1: None, 2: None, 3: None},
 }
 
+MIN_POS = 0
+MAX_POS = 10  # adjust to your actuator max range
+
 def load_presets():
     global preset_positions
 
@@ -46,6 +49,30 @@ def save_presets():
         json.dump(preset_positions, f, indent=4)
 
     print("Presets saved to JSON file.")
+    
+################################################################################
+#                       MQTT POSITION PUBLISHING
+################################################################################
+
+def normalize_to_percent(value):
+    percent = (value - MIN_POS) / (MAX_POS - MIN_POS) * 100
+    return max(0, min(100, percent))  # clamp
+
+async def publish_position(client, actuator_id, raw_value):
+    try:
+        value = float(raw_value)
+        percent = round(normalize_to_percent(value), 1)
+
+        current_positions[actuator_id] = percent
+
+        topic = f"home/desk/actuator{actuator_id}/position"
+        await client.publish(topic, str(percent))
+
+        print(f"M{actuator_id}: {value} → {percent}%")
+
+    except ValueError:
+        print(f"Invalid position value for actuator {actuator_id}: {raw_value}")
+
 
 ################################################################################
 #                           CONFIGURATION
@@ -177,7 +204,7 @@ CONTINUOUS_COMMANDS = {
 
 continuous_tasks = {}
 CONTINUOUS_TIMEOUT = 0.3
-HEARTBEAT_TIMEOUT = 25.0
+HEARTBEAT_TIMEOUT = 6.0
 preset_lock = asyncio.Lock()
 
 # Global variable to track last heartbeat
@@ -199,22 +226,16 @@ async def mqtt_command_handler(client):
             
         # Recieving position data
         if payload.startswith("Feedback1"):
-            full = payload
-            processed = full[11:]
-            current_positions[1] = processed
-            print(f"M1: {processed}")
-                
+            await publish_position(client, 1, payload[11:])
+            continue
+
         elif payload.startswith("Feedback2"):
-            full = payload
-            processed = full[11:]
-            current_positions[2] = processed
-            print(f"M2: {processed}")
+            await publish_position(client, 2, payload[11:])
+            continue
                 
         elif payload.startswith("Feedback3"):
-            full = payload
-            processed = full[11:]
-            current_positions[3] = processed
-            print(f"M3: {processed}")
+            await publish_position(client, 3, payload[11:])
+            continue
                 
         # Detect actuator confirmation
         if payload in pending_acks:
@@ -263,25 +284,34 @@ HEARTBEAT_STATUS_TOPIC = "home/desk/heartbeat_status"
 
 async def heartbeat_monitor(client):
     global last_heartbeat_time
-    heartbeat_ok = True
-    
+
+    heartbeat_lost = False
+    start_time = asyncio.get_event_loop().time()
+
     while True:
         now = asyncio.get_event_loop().time()
+
+        # Never received a heartbeat yet
         if last_heartbeat_time is None:
-            # No heartbeat ever received yet; wait silently at startup
+            if now - start_time > HEARTBEAT_TIMEOUT:
+                if not heartbeat_lost:
+                    print("ERROR: No heartbeat ever received!")
+                    await client.publish(HEARTBEAT_STATUS_TOPIC, "lost")
+                    heartbeat_lost = True
             await asyncio.sleep(1)
             continue
+
+        # Heartbeat was received before, but now timed out
         if now - last_heartbeat_time > HEARTBEAT_TIMEOUT:
-            last_heartbeat_time = now
-            if heartbeat_ok:
+            if not heartbeat_lost:
                 print("ERROR: No heartbeat received!")
                 await client.publish(HEARTBEAT_STATUS_TOPIC, "lost")
-                heartbeat_ok = False
+                heartbeat_lost = True
         else:
-            if not heartbeat_ok:
+            if heartbeat_lost:
                 print("Heartbeat restored")
                 await client.publish(HEARTBEAT_STATUS_TOPIC, "ok")
-                heartbeat_ok = True
+                heartbeat_lost = False
 
         await asyncio.sleep(1)
         
