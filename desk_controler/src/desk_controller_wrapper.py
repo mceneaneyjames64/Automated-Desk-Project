@@ -407,7 +407,7 @@ class DeskControllerWrapper:
         target_value : float
             Target value (degrees for M1, millimeters for M2/M3)
         tolerance : int
-            Acceptable error in mm
+            Acceptable error (degrees for M1, mm for M2/M3)
         timeout : float
             Maximum movement time in seconds
         
