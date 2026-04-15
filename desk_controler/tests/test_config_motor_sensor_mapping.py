@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-def test_sensor_motor_commands_use_expected_motor_to_sensor_associations():
+def test_sensor_motor_command_mappings():
     src_dir = Path(__file__).resolve().parents[1] / "src"
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
