@@ -2,6 +2,7 @@ import importlib
 import sys
 import types
 from pathlib import Path
+from unittest.mock import Mock
 
 
 def _install_mqtt_stubs():
@@ -26,8 +27,28 @@ def _install_mqtt_stubs():
     fake_motor_control = types.ModuleType("motor_control")
     fake_motor_control.move_to_distance = lambda *_args, **_kwargs: True
     fake_motor_control.retract_fully = lambda *_args, **_kwargs: True
-    fake_motor_control.emergency_stop = lambda *_args, **_kwargs: None
+    fake_motor_control.emergency_stop = Mock()
+    fake_motor_control.stop = Mock()
     sys.modules["motor_control"] = fake_motor_control
+
+    fake_calibration = types.ModuleType("calibration")
+    fake_calibration.calibrate_vl53_sensors = Mock()
+    sys.modules["calibration"] = fake_calibration
+
+    return fake_motor_control, fake_calibration
+
+
+def _import_mqtt_with_stubs():
+    src_dir = Path(__file__).resolve().parents[1] / "src"
+    if str(src_dir) not in sys.path:
+        sys.path.insert(0, str(src_dir))
+
+    fake_motor_control, fake_calibration = _install_mqtt_stubs()
+    if "MQTT" in sys.modules:
+        del sys.modules["MQTT"]
+
+    mqtt_module = importlib.import_module("MQTT")
+    return mqtt_module, fake_motor_control, fake_calibration
 
 
 def test_mqtt_parameters_are_loaded_from_config_at_import_time(monkeypatch):
@@ -54,3 +75,42 @@ def test_mqtt_parameters_are_loaded_from_config_at_import_time(monkeypatch):
     assert mqtt_module.PASSWORD == config.MQTT_PASSWORD
     assert mqtt_module.PRESET_FILE == config.MQTT_PRESET_FILE
     assert mqtt_module.HEARTBEAT_INTERVAL == config.MQTT_HEARTBEAT_INTERVAL
+
+
+def test_stop_payload_calls_normal_stop_handler():
+    mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
+
+    mqtt_module.motor_serial_port = object()
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"stop")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_motor_control.stop.assert_called_once_with(mqtt_module.motor_serial_port)
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "STOP")
+
+
+def test_emergency_stop_payload_calls_emergency_stop_handler():
+    mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
+
+    mqtt_module.motor_serial_port = object()
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"emergency_stop")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_motor_control.emergency_stop.assert_called_once_with(mqtt_module.motor_serial_port)
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "EMERGENCY STOP")
+
+
+def test_calibrate_payload_runs_calibration_script():
+    mqtt_module, _, fake_calibration = _import_mqtt_with_stubs()
+
+    mqtt_module.calibration_sensors = {"test_sensor": object()}
+    client = Mock()
+    message = types.SimpleNamespace(payload=b"calibrate")
+
+    mqtt_module.on_message(client, None, message)
+
+    fake_calibration.calibrate_vl53_sensors.assert_called_once_with(mqtt_module.calibration_sensors)
+    client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "Calibration complete")
