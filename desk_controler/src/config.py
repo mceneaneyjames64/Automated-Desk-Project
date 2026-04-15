@@ -77,10 +77,11 @@ CMD_M2_RETRACT = b'\x5a\x08\x62'   # Motor 2 retract (IN)
 CMD_M3_EXTEND  = b'\x5a\x10\x6a'   # Motor 3 extend  (OUT)
 CMD_M3_RETRACT = b'\x5a\x20\x7a'   # Motor 3 retract (IN)
 
-# Map each distance sensor to its motor commands for use in motor_control.py
+# Map each motor-driving sensor to its motor commands for use in motor_control.py
 SENSOR_MOTOR_COMMANDS = {
-    SENSOR_VL53_0: {"extend": CMD_M1_EXTEND, "retract": CMD_M1_RETRACT},
-    SENSOR_VL53_1: {"extend": CMD_M2_EXTEND, "retract": CMD_M2_RETRACT},
+    SENSOR_ADXL: {"extend": CMD_M1_EXTEND, "retract": CMD_M1_RETRACT},
+    SENSOR_VL53_0: {"extend": CMD_M2_EXTEND, "retract": CMD_M2_RETRACT},
+    SENSOR_VL53_1: {"extend": CMD_M3_EXTEND, "retract": CMD_M3_RETRACT},
 }
 
 # =============================================================================
