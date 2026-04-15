@@ -124,6 +124,22 @@ class DeskLogger:
         self._write(self._format_message(LogLevel.ERROR, message))
 
 
+class _InterruptibleSerialProxy:
+    """Serial proxy that raises when stop is requested."""
+    
+    def __init__(self, serial_port, stop_event: threading.Event):
+        self._serial_port = serial_port
+        self._stop_event = stop_event
+    
+    def write(self, data):
+        if self._stop_event.is_set():
+            raise InterruptedError("Motor movement interrupted by stop command")
+        return self._serial_port.write(data)
+    
+    def __getattr__(self, attr):
+        return getattr(self._serial_port, attr)
+
+
 ################################################################################
 #                           DESK CONTROLLER WRAPPER
 ################################################################################
@@ -215,6 +231,8 @@ class DeskControllerWrapper:
         # Locks for thread-safe operations
         self.position_lock = threading.Lock()
         self.mqtt_lock = threading.Lock()
+        self.motor_command_lock = threading.Lock()
+        self.motor_stop_event = threading.Event()
         
         self.logger.info("DeskControllerWrapper initialized")
     
@@ -338,6 +356,39 @@ class DeskControllerWrapper:
     #                           MOTOR CONTROL
     ################################################################################
     
+    def _run_motor_worker(self, task_name: str, task_fn, *args):
+        """Run motor operation in a background worker thread."""
+        try:
+            task_fn(*args)
+        except Exception as e:
+            self.logger.error(f"Motor worker '{task_name}' failed: {e}")
+        finally:
+            self.motor_command_lock.release()
+    
+    def _start_motor_worker(self, task_name: str, task_fn, *args) -> bool:
+        """Start a worker thread for motor operations."""
+        if not self.motor_command_lock.acquire(blocking=False):
+            self.logger.warning(f"Ignoring '{task_name}' command: another actuator is moving")
+            self.publish_status("busy")
+            return False
+        
+        self.motor_stop_event.clear()
+        
+        worker = threading.Thread(
+            target=self._run_motor_worker,
+            args=(task_name, task_fn, *args),
+            daemon=True,
+            name=f"motor-worker-{task_name}",
+        )
+        
+        try:
+            worker.start()
+        except Exception:
+            self.motor_command_lock.release()
+            raise
+        
+        return True
+    
     def move_motor_to_position(self, motor_id: int, target_mm: float, 
                                tolerance: int = 2, timeout: float = 30) -> bool:
         """
@@ -382,11 +433,12 @@ class DeskControllerWrapper:
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
             
+            serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
             success = move_to_distance(
                 self.sensors,
                 sensor_name,
                 target_mm,
-                self.serial_port,
+                serial_port,
                 tolerance=tolerance,
                 timeout=timeout
             )
@@ -410,6 +462,13 @@ class DeskControllerWrapper:
                 self.system_state = SystemState.ERROR
                 self.logger.error(f"✗ Motor {motor_id} failed to reach {target_mm} mm")
                 return False
+        
+        except InterruptedError:
+            self.motor_status[motor_id] = "stopped"
+            if all(status != "moving" for status in self.motor_status.values()):
+                self.system_state = SystemState.IDLE
+            self.logger.warning(f"Motor {motor_id} movement interrupted")
+            return False
         
         except Exception as e:
             self.logger.error(f"Error moving motor {motor_id}: {e}")
@@ -455,7 +514,8 @@ class DeskControllerWrapper:
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
             
-            success = retract_fully(self.sensors, sensor_name, self.serial_port, timeout=timeout)
+            serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
+            success = retract_fully(self.sensors, sensor_name, serial_port, timeout=timeout)
             
             if success:
                 with self.position_lock:
@@ -476,6 +536,13 @@ class DeskControllerWrapper:
                 self.logger.error(f"✗ Motor {motor_id} failed to retract")
                 return False
         
+        except InterruptedError:
+            self.motor_status[motor_id] = "stopped"
+            if all(status != "moving" for status in self.motor_status.values()):
+                self.system_state = SystemState.IDLE
+            self.logger.warning(f"Motor {motor_id} retraction interrupted")
+            return False
+        
         except Exception as e:
             self.logger.error(f"Error retracting motor {motor_id}: {e}")
             self.motor_status[motor_id] = "error"
@@ -493,6 +560,7 @@ class DeskControllerWrapper:
         """
         try:
             self.logger.warning("EMERGENCY STOP - All motors disabled")
+            self.motor_stop_event.set()
             emergency_stop(self.serial_port)
             
             for motor_id in [1, 2, 3]:
@@ -787,12 +855,28 @@ class DeskControllerWrapper:
                     motor_id = int(motor_part[1:])
                     
                     if direction_part.lower() == "up":
-                        self.move_motor_to_position(motor_id, config.MAX_POSITION)
+                        self._start_motor_worker(
+                            f"m{motor_id}-up",
+                            self.move_motor_to_position,
+                            motor_id,
+                            config.MAX_POSITION
+                        )
                     elif direction_part.lower() == "down":
-                        self.retract_motor_fully(motor_id)
+                        self._start_motor_worker(
+                            f"m{motor_id}-down",
+                            self.retract_motor_fully,
+                            motor_id
+                        )
+                    elif direction_part.lower() == "stop":
+                        self.emergency_stop_all()
                     else:
                         target_pos = float(direction_part)
-                        self.move_motor_to_position(motor_id, target_pos)
+                        self._start_motor_worker(
+                            f"m{motor_id}-move",
+                            self.move_motor_to_position,
+                            motor_id,
+                            target_pos
+                        )
             
             elif payload.startswith("preset_") and not payload.endswith("_save"):
                 # Preset load: "preset_one", "preset_two", "preset_three"
@@ -800,7 +884,11 @@ class DeskControllerWrapper:
                 preset_word = payload.split("_")[1]
                 preset_id = preset_names.get(preset_word)
                 if preset_id:
-                    self.load_and_execute_preset(preset_id)
+                    self._start_motor_worker(
+                        f"preset-{preset_id}",
+                        self.load_and_execute_preset,
+                        preset_id
+                    )
             
             elif payload.startswith("set_preset_"):
                 # Preset save: "set_preset_one", "set_preset_two", "set_preset_three"
