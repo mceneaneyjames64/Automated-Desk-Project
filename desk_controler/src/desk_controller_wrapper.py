@@ -373,6 +373,13 @@ class DeskControllerWrapper:
     def _motor_min_target(self, motor_id: int) -> float:
         """Return minimum allowed target for motor_id in its native unit."""
         return config.MIN_ANGLE_DEG if motor_id == 1 else config.MIN_POSITION
+
+    def _distance_sensor_for_motor(self, motor_id: int) -> Optional[str]:
+        """Return VL53 sensor name for distance motors (M2/M3), else None."""
+        return {
+            2: config.SENSOR_VL53_0,
+            3: config.SENSOR_VL53_1,
+        }.get(motor_id)
     
     def _run_motor_worker(self, task_name: str, task_fn, *args):
         """Run motor operation in a background worker thread."""
@@ -452,10 +459,7 @@ class DeskControllerWrapper:
                     timeout=timeout,
                 )
             else:
-                sensor_name = {
-                    2: config.SENSOR_VL53_0,
-                    3: config.SENSOR_VL53_1,
-                }.get(motor_id)
+                sensor_name = self._distance_sensor_for_motor(motor_id)
                 if not sensor_name:
                     self.logger.error(f"No sensor mapped for motor {motor_id}")
                     return False
@@ -534,10 +538,7 @@ class DeskControllerWrapper:
             if motor_id == 1:
                 success = retract_tilt(self.sensors, serial_port, timeout=timeout)
             else:
-                sensor_name = {
-                    2: config.SENSOR_VL53_0,
-                    3: config.SENSOR_VL53_1,
-                }.get(motor_id)
+                sensor_name = self._distance_sensor_for_motor(motor_id)
                 if not sensor_name:
                     self.logger.error(f"No sensor mapped for motor {motor_id}")
                     return False
