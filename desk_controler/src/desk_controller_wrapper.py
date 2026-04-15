@@ -33,7 +33,13 @@ from hardware import (
     init_serial,
     get_sensor_value,
 )
-from motor_control import move_to_distance, retract_fully, emergency_stop
+from motor_control import (
+    move_to_distance,
+    move_to_angle,
+    retract_fully,
+    retract_tilt,
+    emergency_stop,
+)
 from calibration import calibrate_vl53_sensors, load_calibration, get_calibrated_reading
 
 try:
@@ -389,7 +395,7 @@ class DeskControllerWrapper:
         
         return True
     
-    def move_motor_to_position(self, motor_id: int, target_mm: float, 
+    def move_motor_to_position(self, motor_id: int, target_mm: float,
                                tolerance: int = 2, timeout: float = 30) -> bool:
         """
         Move a motor to a specific position.
@@ -419,29 +425,35 @@ class DeskControllerWrapper:
                 self.logger.error(f"Invalid motor ID: {motor_id}")
                 return False
             
-            # Get sensor for this motor
-            sensor_name = {
-                1: config.SENSOR_VL53_0,
-                2: config.SENSOR_VL53_1,
-            }.get(motor_id)
-            
-            if not sensor_name:
-                self.logger.error(f"No sensor mapped for motor {motor_id}")
-                return False
-            
             self.logger.info(f"Moving motor {motor_id} to {target_mm} mm")
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
             
             serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
-            success = move_to_distance(
-                self.sensors,
-                sensor_name,
-                target_mm,
-                serial_port,
-                tolerance=tolerance,
-                timeout=timeout
-            )
+            if motor_id == 1:
+                success = move_to_angle(
+                    self.sensors,
+                    target_mm,
+                    serial_port,
+                    tolerance=tolerance,
+                    timeout=timeout,
+                )
+            else:
+                sensor_name = {
+                    2: config.SENSOR_VL53_0,
+                    3: config.SENSOR_VL53_1,
+                }.get(motor_id)
+                if not sensor_name:
+                    self.logger.error(f"No sensor mapped for motor {motor_id}")
+                    return False
+                success = move_to_distance(
+                    self.sensors,
+                    sensor_name,
+                    target_mm,
+                    serial_port,
+                    tolerance=tolerance,
+                    timeout=timeout,
+                )
             
             if success:
                 with self.position_lock:
@@ -501,25 +513,28 @@ class DeskControllerWrapper:
                 self.logger.error(f"Invalid motor ID: {motor_id}")
                 return False
             
-            sensor_name = {
-                1: config.SENSOR_VL53_0,
-                2: config.SENSOR_VL53_1,
-            }.get(motor_id)
-            
-            if not sensor_name:
-                self.logger.error(f"No sensor mapped for motor {motor_id}")
-                return False
-            
             self.logger.info(f"Retracting motor {motor_id} to minimum position")
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
             
             serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
-            success = retract_fully(self.sensors, sensor_name, serial_port, timeout=timeout)
+            if motor_id == 1:
+                success = retract_tilt(self.sensors, serial_port, timeout=timeout)
+            else:
+                sensor_name = {
+                    2: config.SENSOR_VL53_0,
+                    3: config.SENSOR_VL53_1,
+                }.get(motor_id)
+                if not sensor_name:
+                    self.logger.error(f"No sensor mapped for motor {motor_id}")
+                    return False
+                success = retract_fully(self.sensors, sensor_name, serial_port, timeout=timeout)
             
             if success:
                 with self.position_lock:
-                    self.motor_positions[motor_id] = config.MIN_POSITION
+                    self.motor_positions[motor_id] = (
+                        config.MIN_ANGLE_DEG if motor_id == 1 else config.MIN_POSITION
+                    )
                 self.motor_status[motor_id] = "idle"
                 self.logger.info(f"✓ Motor {motor_id} fully retracted")
                 
@@ -855,11 +870,12 @@ class DeskControllerWrapper:
                     motor_id = int(motor_part[1:])
                     
                     if direction_part.lower() == "up":
+                        target = config.MAX_ANGLE_DEG if motor_id == 1 else config.MAX_POSITION
                         self._start_motor_worker(
                             f"m{motor_id}-up",
                             self.move_motor_to_position,
                             motor_id,
-                            config.MAX_POSITION
+                            target
                         )
                     elif direction_part.lower() == "down":
                         self._start_motor_worker(
