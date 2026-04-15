@@ -51,6 +51,19 @@ SERIAL_BAUDRATE = 2400
 SERIAL_TIMEOUT  = 1           # seconds
 
 # =============================================================================
+# MQTT Configuration
+# =============================================================================
+MQTT_BROKER = "192.168.1.138"
+MQTT_PORT = 1883
+MQTT_TOPIC_COMMAND = "home/desk/command"
+MQTT_TOPIC_STATUS = "home/desk/status"
+MQTT_TOPIC_FEEDBACK = "home/desk/feedback"
+MQTT_USERNAME = "mqtttest"
+MQTT_PASSWORD = "VMIececapstone"
+MQTT_PRESET_FILE = "desk_presets.json"
+MQTT_HEARTBEAT_INTERVAL = 60  # seconds
+
+# =============================================================================
 # Motor Control Commands  (3-byte packets: header, command, checksum)
 # =============================================================================
 CMD_ALL_OFF = b'\x5a\x00\x5a'   # Stop all motors
