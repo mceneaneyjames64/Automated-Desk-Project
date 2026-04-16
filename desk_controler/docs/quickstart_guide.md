@@ -120,126 +120,57 @@ i2cdetect -y 1
 ## Step 3: Software Installation (5 minutes)
 
 ### Clone and Install
+
 ```bash
 # Navigate to your projects directory
 cd ~
 
-# Clone the repository (or download and extract)
-git clone <repository-url> desk_controler
-cd desk_controler
+# Clone the repository
+git clone https://github.com/mceneaneyjames64/Automated-Desk-Project.git
+cd Automated-Desk-Project/desk_controler/src
 
 # Install Python dependencies
 pip3 install -r requirements.txt
+```
 
 ### Verify Installation
+
 ```bash
 # Check Python version
 python3 --version
 # Should be 3.7 or higher
 
-# Verify dependencies installed
+# Verify key dependencies are installed
 pip3 list | grep -E 'adafruit|pyserial'
-
-
- ```
-
-## Step 3: Software Installation (5 minutes) ---> Step by Step
-
-This step installs the project and its required Python packages in a safe, isolated environment.
-
-## 1. Open a Terminal
-
- macOS: Applications → Utilities → Terminal
-
- Linux: Open your terminal app
-
- Windows: Open PowerShell (recommended)
-
-## 2. Go to Your Home Directory
-
- This is a safe place to keep projects.
-
- cd ~
-
-## 3. Clone the Project Repository
-
- Replace <repository-url> with the actual repository URL.
-
- git clone <repository-url> desk_controller
- cd desk_controller
-
-
-## If git is not installed, install it first:
-
- macOS: brew install git
-
- Ubuntu/Debian: sudo apt install git
-
- Windows: https://git-scm.com/downloads
-
-## 4. Check Your Python Version
- python3 --version
-
-
- You should see Python 3.7 or higher.
-
- If that fails:
-
- Try python --version
-
- On Windows, make sure Python is installed from https://python.org
-  and “Add Python to PATH” was checked during install.
-
-## 5. Create a Virtual Environment (Strongly Recommended)
-
- This keeps project dependencies from affecting your system.
-
- python3 -m venv venv
-
- Activate it:
-
- macOS / Linux
-
- source venv/bin/activate
-
-
- Windows (PowerShell)
-
- venv\Scripts\Activate.ps1
-
-
- You should now see (venv) at the start of your terminal line.
-
-## 6. Install Required Python Packages
- pip install --upgrade pip
- pip install -r requirements.txt
-
-
- Wait for the installation to finish (this may take a minute).
-
-## 7. Verify the Installation
- Confirm key dependencies are installed:
- pip list
-
-
-Look for:
-
- pyserial
-
- adafruit (or Adafruit-related packages)
-
- Optional automatic check (works on all systems):
- python - <<EOF
- import pkg_resources
- packages = ["pyserial", "adafruit"]
- for p in packages:
-     found = any(p in d.project_name.lower() for d in pkg_resources.working_set)
-     print(f"{p}: {'OK' if found else 'MISSING'}")
- EOF
-
 ```
+
+### Virtual Environment (Recommended)
+
+Using a virtual environment keeps project dependencies isolated:
+
+```bash
+# Create virtual environment (run from the src/ directory)
+python3 -m venv venv
+
+# Activate (Linux / macOS)
+source venv/bin/activate
+
+# Activate (Windows PowerShell)
+# venv\Scripts\Activate.ps1
+
+# Install dependencies inside the environment
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+### If git is not installed
+
+- macOS: `brew install git`
+- Ubuntu/Debian: `sudo apt install git`
+- Windows: https://git-scm.com/downloads
+
 ---
-```
+
 ## Step 4: First Run (2 minutes)
 
 ### Test Hardware Detection
@@ -507,11 +438,11 @@ pip3 install adafruit-blinka adafruit-circuitpython-vl53l0x
 
 Once you're up and running, explore these resources:
 
-1. **[README.md](README.md)** - Full documentation and API reference
-2. **[README_TESTS.md](README_TESTS.md)** - Testing guide
-3. **[config.py](config.py)** - Customize settings
-4. **[motor_control.py](motor_control.py)** - Motor control functions
-5. **[calibration.py](calibration.py)** - Calibration functions
+1. **[desk_controler/README.md](../README.md)** — Full technical architecture and API reference
+2. **[tests/README.md](../tests/README.md)** — Testing guide
+3. **[Calibration.md](Calibration.md)** — Detailed calibration procedures
+4. **[Examples.md](Examples.md)** — Usage examples and common patterns
+5. **[Troubleshooting Guide.md](Troubleshooting%20Guide.md)** — Solutions to common issues
 
 ### Customize Your Setup
 
@@ -535,8 +466,8 @@ I2C_RETRIES = 5       # More retries for reliability
 If you encounter issues:
 
 1. Check the troubleshooting section above
-2. Review the [full README.md](README.md)
-3. Run diagnostic tests: `python3 run_tests.py --quick`
+2. Review the [Troubleshooting Guide](Troubleshooting%20Guide.md) for more solutions
+3. Run diagnostic tests: `cd desk_controler/tests && python -m pytest -q`
 4. Check hardware connections
 5. Verify I2C devices: `i2cdetect -y 1`
 
@@ -551,10 +482,10 @@ If you encounter issues:
 | Test hardware | `python3 run_tests.py --quick` |
 | Check I2C | `i2cdetect -y 1` |
 | Emergency stop | Call `emergency_stop(ser)` in code |
-| View calibration | `cat vl53_calibration.json` |
+| View calibration | `grep "^OFFSET" desk_controler/src/config.py` |
 
 ---
 
 **Congratulations! Your desk controller is ready to use! 🎊**
 
-For detailed documentation, see [README.md](README.md)
+For detailed documentation, see [desk_controler/README.md](../README.md)
