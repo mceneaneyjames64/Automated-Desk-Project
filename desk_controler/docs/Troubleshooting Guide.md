@@ -30,7 +30,7 @@ Solutions to common hardware and software issues with the Automated Desk Control
 
 **Cause:** I2C bus not enabled, wiring error, or damaged component.  
 **Fix:**
-- Confirm 3.3 V power is connected to the TCA9548A VCC pin
+- Confirm 5 V power is connected to the TCA9548A VCC pin
 - Make sure SDA and SCL are not swapped
 - Check for loose or broken jumper wires
 - Add 4.7 kΩ pull-up resistors on SDA and SCL if the bus is long
