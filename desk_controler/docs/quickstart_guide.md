@@ -126,7 +126,7 @@ i2cdetect -y 1
 cd ~
 
 # Clone the repository
-git clone https://github.com/mceneaneyjames64/Automated-Desk-Project.git Automated-Desk-Project
+git clone https://github.com/mceneaneyjames64/Automated-Desk-Project.git
 cd Automated-Desk-Project/desk_controler/src
 
 # Install Python dependencies
