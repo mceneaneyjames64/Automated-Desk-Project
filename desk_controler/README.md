@@ -1,48 +1,57 @@
-# Hardware Control System 
+# Hardware Control System
 
-##  Table of Contents
-1. [Directory Layout FIXME](#directory-layout)
+## Table of Contents
+1. [Directory Layout](#directory-layout)
 2. [System Overview](#system-overview)
 3. [Hardware Components](#hardware-components)
 4. [Code Flow](#code-flow)
 5. [Detailed Function Explanations](#detailed-function-explanations)
 6. [Key Concepts](#key-concepts)
-7. [Related Documentation FIXME](#related-documentation)
+7. [Related Documentation](#related-documentation)
 
 
 ---
-## Directory Layout FIXME
-```bash
+## Directory Layout
+```
 desk_controler/
 ├── src/
 │   ├── __init__.py
 │   ├── main.py                      # Main application entry point
-│   ├── config.py                    # Configuration settings
-│   ├── calibration.py               # Calibration script  
-│   ├── motor_controller.py
+│   ├── config.py                    # Configuration settings & motor commands
+│   ├── calibration.py               # VL53L0X calibration script
+│   ├── motor_control.py             # Motor control logic
+│   ├── desk_controller_wrapper.py   # High-level control wrapper
+│   ├── desk_controller_service.py   # Background service runner
+│   ├── MQTT.py                      # MQTT client integration
 │   ├── hardware/
 │   │   ├── __init__.py
 │   │   ├── i2c_utils.py             # I2C bus management
-│   │   ├── sensors.py               # sensor setup
-│   │   └── serial_comm.py           # Serial communiction setup
-│   ├── utils/
-│   │   ├── __init__.py
-│   │   ├── misc.py                  # Miscalanious scripts
-│   │   ├── timeout.py 			     # Timeout logic
-│   │   └── heartbeat.py             # Heartbeat monitoring FIXME: DOES NOT EXIST YEY
+│   │   ├── sensors.py               # Sensor setup & reading
+│   │   └── serial_comm.py           # Serial communication setup
+│   └── utils/
+│       ├── __init__.py
+│       ├── misc.py                  # Angle conversion helpers
+│       └── timeout.py               # Timeout logic
 ├── tests/
-│	├── test_hardware_system.py      # Unit tests for individual components
-│	├── test_integration.py          # Integration tests with simulated hardware
-│	├── pytest.ini                   # Pytest configuration
-│	├── test_requirements.txt        # Test dependencies
-│	├── run_tests.py                 # Test runner script
-│	└── README_TESTS.md              # Tests documentation
+│   ├── test_hardware_system.py      # Unit tests for individual components
+│   ├── test_integration.py          # Integration tests with simulated hardware
+│   ├── test_desk_controller_wrapper_mqtt_async.py
+│   ├── test_mqtt_config_loading.py
+│   ├── test_config_motor_sensor_mapping.py
+│   ├── test_motor_control_retract_minimum.py
+│   ├── test_drift.py
+│   ├── pytest.ini                   # Pytest configuration
+│   ├── test_requirements.txt        # Test dependencies
+│   ├── run_tests.py                 # Test runner script
+│   └── README.md                    # Tests documentation
 ├── docs/
-│   ├── Troubleshooting_guide.md
-│   ├── Calibration.md
-│   └── Examples.md
-├── requirements.txt                 # Python dependencies                      
-└── README.md                        # Project documentation
+│   ├── quickstart_guide.md          # Step-by-step setup guide
+│   ├── Calibration.md               # Calibration procedures
+│   ├── Examples.md                  # Usage examples
+│   ├── Key_concepts.md              # Core concepts explained
+│   └── Troubleshooting Guide.md     # Troubleshooting reference
+├── requirements.txt                 # Python dependencies
+└── README.md                        # This file
 ```
 
 ## System Overview
@@ -66,7 +75,7 @@ graph TD
     
     MUX -->|Channel 0| VL1["VL53L0X<br/>Distance Sensor #1"]
     MUX -->|Channel 1| VL2["VL53L0X<br/>Distance Sensor #2"]
-    MUX -->|Channel 1| ACCEL["ADXL345<br/>3-Axis Accelerometer"]
+    MUX -->|Channel 2| ACCEL["ADXL345<br/>3-Axis Accelerometer"]
     
     MOTOR --> ACTUATOR["Motor/Actuator<br/>────────────<br/>Physical Movement"]
     
@@ -88,7 +97,7 @@ graph TD
 | **TCA9548A** | I2C multiplexer (8 channels) | I2C Bus |
 | **VL53L0X #1** | Distance sensor | Channel 0 |
 | **VL53L0X #2** | Distance sensor | Channel 1 |
-| **ADXL345** | 3-axis accelerometer | Channel 1 |
+| **ADXL345** | 3-axis accelerometer | Channel 2 |
 | **Motor Controller** | Position control | Serial/UART |
 | **Server** | Remote command & monitoring | MQTT |
 
@@ -163,18 +172,57 @@ graph TD
     style Z fill:#ccccff
     style M fill:#fff4cc
 ```
->**Note**: FIXME add detail about only one axis being used
+>**Note**: Only the Z-axis is used for tilt angle measurement. The X and Y axes are not used in this application.
 
-#### Angle calculation:
-FIXME: add angle measurement equation
+#### Angle calculation
+
+The Z-axis acceleration reading is converted to a tilt angle using the following formula:
+
+```
+angle = 180° − arccos( clamp(z / g, −1, 1) )
+```
+
+Where:
+- `z` = Z-axis acceleration in m/s²
+- `g` = gravitational acceleration (9.81 m/s²)
+- `clamp(v, −1, 1)` = clips the ratio to the valid domain of arccos
+
+**Angle convention:**
+
+| Z-axis reading | Angle |
+|----------------|-------|
+| Z ≈ −g (upside down) | 0° |
+| Z ≈ 0 (perpendicular to ground) | 90° |
+| Z ≈ +g (right-side up) | 180° |
+
+Safe operating range: **60° – 120°** (configurable via `MIN_ANGLE_DEG` / `MAX_ANGLE_DEG` in `config.py`)
 
 ### 4. **Motor Controller (Serial Communication)**
--   **What**: interface between the Raspberry Pi and existing control box
--   **Interface**: Serial port (UART) - sends byte commands FIXME: add serial port name
--   **Commands**: Move, Stop, Set Position, etc. FIXME: Add commands from config .py
+-   **What**: Interface between the Raspberry Pi and the existing control box
+-   **Interface**: Serial port (UART) — `/dev/serial0` at **2400 baud**
+-   **Commands**: 3-byte packets with header `0x5A`, command byte, and checksum
 
-**Note**: Commands sent form the raspberry Pi to the control box toggle the function. If the box is given and 
-extend command the actuator will not stop unless the stop command is given or the actuator runs into it upper limit.
+**Motor Command Reference** (from `config.py`):
+
+| Constant | Bytes | Action |
+|----------|-------|--------|
+| `CMD_ALL_OFF` | `5A 00 5A` | Stop all motors |
+| `CMD_M1_EXTEND` | `5A 01 5B` | Motor 1 extend (OUT) |
+| `CMD_M1_RETRACT` | `5A 02 5C` | Motor 1 retract (IN) |
+| `CMD_M2_EXTEND` | `5A 04 5E` | Motor 2 extend (OUT) |
+| `CMD_M2_RETRACT` | `5A 08 62` | Motor 2 retract (IN) |
+| `CMD_M3_EXTEND` | `5A 10 6A` | Motor 3 extend (OUT) |
+| `CMD_M3_RETRACT` | `5A 20 7A` | Motor 3 retract (IN) |
+
+**Sensor → Motor mapping:**
+
+| Sensor | Motor | Direction logic |
+|--------|-------|-----------------|
+| `adxl345` | Motor 1 | Z-axis angle controls tilt |
+| `vl53l0x_0` | Motor 2 | Distance controls height #1 |
+| `vl53l0x_1` | Motor 3 | Distance controls height #2 |
+
+> **Note**: Commands sent from the Raspberry Pi to the control box toggle the function. If the box receives an extend command the actuator will not stop unless a stop command is issued or the actuator reaches its upper limit.
 ## Code Flow
 
 ### Main Program Execution Flow
@@ -236,51 +284,50 @@ flowchart TD
 
 ### 2. `calibrate_vl53_sensors(sensors)`
 
-**Purpose**: Establish a "home" or "baseline" position for the system
+**Purpose**: Establish a software offset so all subsequent distance readings are corrected relative to a known reference position.
 
 **How it works:**
-```python
-# Conceptual flow: FIXME: not how the new function works
-1. System is at unknown position
-2. Take 10 distance readings from sensor
-3. Average them to get baseline
-   Example: [100, 101, 99, 100, 100, 101, 99, 100, 101, 100]
-   Average: 100.1mm ← This is your "home position"
-4. Save this to a file (calibration.json)
+```
+1. System must be at fully retracted position (known distance = 0 mm)
+2. Take 30 distance readings from each VL53L0X sensor
+3. Average them to get a raw baseline
+   Example samples: [121, 121, 120, 121, 122, ...]
+   Average raw reading: 121.3 mm
+4. Calculate offset: offset = -(raw_average - known_distance) = -121.3 mm
+5. Save offsets to config.OFFSET and persist to config.py
 ```
 
 **Why calibration is needed:**
-- Sensors measure absolute distance to nearest object
-- But you want to know position **relative to a starting point**
-- Calibration says "THIS is position zero"
-- All future movements are relative to this
+- Sensors measure absolute distance to the nearest object
+- You want to know position **relative to the fully retracted position**
+- Calibration establishes what reading corresponds to position zero
+- The software offset is then applied to every subsequent reading
 
 **Example:**
 ```
-Calibration baseline: 100mm
-Current reading: 150mm
-→ You've moved 50mm from home position
+Raw average at retracted position: 121 mm
+Calculated offset: -121 mm
+
+Later — raw reading: 171 mm
+Corrected reading: 171 + (-121) = 50 mm
+→ You've extended 50 mm from the retracted position
 ```
 
 ---
 
-### 3. `move_station_distance(sensors, sensor_name, target_mm, ser)`
+### 3. `move_to_distance(sensors, sensor_name, target_mm, ser)`
 
-**Purpose**: Move motor to an **absolute** distance reading
-
----
-
-### 4. `move_station_distance_calibrated(sensors, calibration_data, sensor_name, relative_mm, ser)`
-
-**Purpose**: Move **relative to the calibrated baseline**
-
-**Why two movement functions?**
-- `move_station_distance()` → "Go to 150mm" (absolute)
-- `move_station_distance_calibrated()` → "Extend 50mm from home" (relative)
+**Purpose**: Move an actuator to an **absolute** corrected distance reading using closed-loop control.
 
 ---
 
-### 5. `move_to_retracted(sensors, sensor_name, ser)`
+### 4. `move_to_angle(sensors, target_deg, ser)`
+
+**Purpose**: Move the tilt actuator to a target **angle in degrees** using ADXL345 feedback.
+
+---
+
+### 5. `retract_fully(sensors, sensor_name, ser)`
 
 **Purpose**: Return to the fully retracted (home) position
 
@@ -288,13 +335,16 @@ Current reading: 150mm
 
 ### 6. `emergency_stop(ser)`
 
-**Purpose**: Immediately halt all motor movement
+**Purpose**: Immediately halt all motor movement by sending `CMD_ALL_OFF`
 
 ---
 
 ### 7. `get_sensor_value(sensors, sensor_name)`
 
 **Purpose**: Read current value from a specific sensor
+
+- Returns **mm** (int) for VL53L0X distance sensors
+- Returns **degrees** (float) for the ADXL345 tilt sensor
 
 
 ## Safety Considerations
@@ -329,13 +379,18 @@ finally:
     # Always execute, even if error
     ser.write(config.OFF)
 ```
-## Related Documentation FIXME
+## Related Documentation
 
--   Testing Guide - Comprehensive testing documentation
--   [Adafruit CircuitPython](https://docs.circuitpython.org/) - Library documentation
--   [VL53L0X Datasheet](https://www.st.com/resource/en/datasheet/vl53l0x.pdf)
--   [ADXL345 Datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf)
-- [I2C Documentation](
+- [Quick Start Guide](docs/quickstart_guide.md) — Get up and running in 15 minutes
+- [Calibration Guide](docs/Calibration.md) — Sensor calibration procedures
+- [Examples](docs/Examples.md) — Usage examples and common patterns
+- [Key Concepts](docs/Key_concepts.md) — I2C, multiplexers, angle sensing explained
+- [Troubleshooting Guide](docs/Troubleshooting%20Guide.md) — Common issues and solutions
+- [Test Suite Documentation](tests/README.md) — Testing guide
+- [Adafruit CircuitPython](https://docs.circuitpython.org/) — Library documentation
+- [VL53L0X Datasheet](https://www.st.com/resource/en/datasheet/vl53l0x.pdf)
+- [ADXL345 Datasheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ADXL345.pdf)
+- [I2C Protocol Overview (TI)](https://www.ti.com/lit/an/sbaa565/sbaa565.pdf)
 
 
 

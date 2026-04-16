@@ -28,10 +28,15 @@ This test suite provides comprehensive testing for:
 .
 ├── test_hardware_system.py      # Unit tests for individual components
 ├── test_integration.py          # Integration tests with simulated hardware
+├── test_desk_controller_wrapper_mqtt_async.py  # MQTT wrapper tests
+├── test_mqtt_config_loading.py  # MQTT config loading tests
+├── test_config_motor_sensor_mapping.py         # Motor/sensor mapping tests
+├── test_motor_control_retract_minimum.py       # Retract minimum tests
+├── test_drift.py                # Drift / long-run tests
 ├── pytest.ini                   # Pytest configuration
 ├── test_requirements.txt        # Test dependencies
 ├── run_tests.py                 # Test runner script
-└── README_TESTS.md             # This file
+└── README.md                    # This file
 ```
 
 ### Test Files

@@ -148,42 +148,53 @@ Channel 2 → ADXL345    (0x53)
 
 ```
 
-### Directory Structure FIXME add root directory
+### Directory Structure
 
 ```
-desk_controler/
-├── src/                          # Source code
-│   ├── main.py                   # Main application entry point
-│   ├── config.py                 # Configuration constants
-│   ├── calibration.py            # Calibration routines
-│   ├── motor_control.py          # Motor control logic
-│   ├── requirements.txt          # Python dependencies
-│   ├── vl53_calibration.json     # Calibration data (generated)
-│   ├── hardware/                 # Hardware interface modules
-│   │   ├── __init__.py
-│   │   ├── i2c_utils.py          # I2C and multiplexer utilities
-│   │   ├── sensors.py            # Sensor initialization/reading
-│   │   └── serial_comm.py        # Serial communication
-│   └── utils/                    # Utility functions
-│       ├── __init__.py
-│       ├── timeout.py            # Timeout handling
-│       └── misc.py               # Helper functions
+Automated-Desk-Project/           # Repository root
+├── README.md                     # This file
+├── heartbeat-handler.py          # Standalone heartbeat monitor
 │
-├── tests/                        # Test suite
-│   ├── test_hardware_system.py   # Unit tests
-│   ├── test_integration.py       # Integration tests
-│   ├── test_requirements.txt     # Test dependencies
-│   ├── run_tests.py              # Test runner
-│   ├── pytest.ini                # Pytest configuration
-│   ├── Makefile                  # Test automation
-│   └── README.md                 # Test documentation
-│
-├── MQTT_Pi/                      # MQTT integration
-│   └── MQTT_CAPSTONE_pi.py/
-│       ├── __init__.py
-│       └── MQTT_CAPSTONE_pi.py   # MQTT client
-│
-└── README.md                     # This file
+└── desk_controler/               # Main controller application
+    ├── README.md                 # Detailed technical architecture
+    ├── src/                      # Source code
+    │   ├── main.py               # Main application entry point
+    │   ├── config.py             # Configuration constants & commands
+    │   ├── calibration.py        # VL53L0X calibration routines
+    │   ├── motor_control.py      # Motor control logic
+    │   ├── desk_controller_wrapper.py  # High-level control wrapper
+    │   ├── desk_controller_service.py  # Background service
+    │   ├── MQTT.py               # MQTT client integration
+    │   ├── requirements.txt      # Python dependencies
+    │   ├── hardware/             # Hardware interface modules
+    │   │   ├── __init__.py
+    │   │   ├── i2c_utils.py      # I2C and multiplexer utilities
+    │   │   ├── sensors.py        # Sensor initialization/reading
+    │   │   └── serial_comm.py    # Serial communication
+    │   └── utils/                # Utility functions
+    │       ├── __init__.py
+    │       ├── timeout.py        # Timeout handling
+    │       └── misc.py           # Angle conversion helpers
+    │
+    ├── tests/                    # Test suite
+    │   ├── test_hardware_system.py           # Unit tests
+    │   ├── test_integration.py               # Integration tests
+    │   ├── test_desk_controller_wrapper_mqtt_async.py
+    │   ├── test_mqtt_config_loading.py
+    │   ├── test_config_motor_sensor_mapping.py
+    │   ├── test_motor_control_retract_minimum.py
+    │   ├── test_drift.py
+    │   ├── test_requirements.txt             # Test dependencies
+    │   ├── run_tests.py                      # Test runner
+    │   ├── pytest.ini                        # Pytest configuration
+    │   └── README.md                         # Test documentation
+    │
+    └── docs/                     # Additional documentation
+        ├── quickstart_guide.md   # Step-by-step setup guide
+        ├── Calibration.md        # Calibration procedures
+        ├── Examples.md           # Usage examples
+        ├── Key_concepts.md       # Core concepts explained
+        └── Troubleshooting Guide.md  # Troubleshooting reference
 
 ```
 
@@ -232,8 +243,8 @@ i2cdetect -y 1
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/desk_controler.git
-cd desk_controler
+git clone https://github.com/mceneaneyjames64/Automated-Desk-Project.git
+cd Automated-Desk-Project/desk_controler/src
 
 # Create virtual environment
 python3 -m venv venv
@@ -265,10 +276,20 @@ python3 -c "from hardware import init_i2c; init_i2c()"
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 
-## Support FIXME: add all docs
+## Support
 
-**Issues:** https://github.com/yourusername/desk_controler/issues  
-**Documentation:** Full code documentation in README.md  
-**Tests:** Test documentation in tests/README.md
+**Issues:** https://github.com/mceneaneyjames64/Automated-Desk-Project/issues
+
+### Documentation
+
+| Document | Description |
+|----------|-------------|
+| [desk_controler/README.md](desk_controler/README.md) | Detailed technical architecture, hardware components, code flow, and API reference |
+| [docs/quickstart_guide.md](desk_controler/docs/quickstart_guide.md) | Step-by-step setup guide — get running in 15 minutes |
+| [docs/Calibration.md](desk_controler/docs/Calibration.md) | Full sensor calibration procedures |
+| [docs/Examples.md](desk_controler/docs/Examples.md) | Usage examples and common patterns |
+| [docs/Key_concepts.md](desk_controler/docs/Key_concepts.md) | I2C, multiplexers, angle sensing, closed-loop control explained |
+| [docs/Troubleshooting Guide.md](desk_controler/docs/Troubleshooting%20Guide.md) | Solutions to common hardware and software issues |
+| [tests/README.md](desk_controler/tests/README.md) | Test suite documentation |
 
 
