@@ -199,3 +199,106 @@ def test_direct_motor_methods_reject_while_calibrating():
     assert controller.retract_motor_fully(1) is False
     assert move_calls["count"] == 0
     assert retract_calls["count"] == 0
+
+
+def test_preset_load_motors_move_in_correct_order():
+    """Motors must be moved in order: M2 (keyboard) → M3 (monitor) → M1 (tilt)."""
+    move_order = []
+
+    def move_impl(_sensors, sensor_name, _target, _ser, tolerance=2, timeout=30):
+        move_order.append(sensor_name)
+        return True
+
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=move_impl,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+    controller.presets[1] = {1: 90.0, 2: 200.0, 3: 300.0}
+
+    result = controller.load_and_execute_preset(1)
+
+    assert result is True
+    # M2 uses vl53l0x_0, M3 uses vl53l0x_1, M1 uses adxl345
+    assert move_order == ["vl53l0x_0", "vl53l0x_1", "adxl345"]
+
+
+def test_preset_load_mqtt_message_numeric_format():
+    """MQTT 'preset 1' message triggers preset execution."""
+    preset_executed = threading.Event()
+
+    def move_impl(_sensors, _sensor_name, _target, _ser, tolerance=2, timeout=30):
+        preset_executed.set()
+        return True
+
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=move_impl,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+    controller.presets[2] = {1: 90.0, 2: 150.0, 3: 250.0}
+
+    controller._mqtt_on_message(None, None, _Message(b"preset 2"))
+    assert _wait_for(lambda: preset_executed.is_set())
+
+
+def test_save_preset_mqtt_message_numeric_format(tmp_path):
+    """MQTT 'save preset 1' message saves current positions to preset."""
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=lambda *_args, **_kwargs: True,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    presets_file = str(tmp_path / "test_presets.json")
+    controller = wrapper_module.DeskControllerWrapper(
+        presets_file=presets_file,
+        log_file=None,
+    )
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+    controller.motor_positions = {1: 80.0, 2: 180.0, 3: 280.0}
+
+    controller._mqtt_on_message(None, None, _Message(b"save preset 3"))
+
+    assert controller.presets[3] == {1: 80.0, 2: 180.0, 3: 280.0}
+
+
+def test_preset_load_emergency_stop_interrupts_sequence():
+    """Emergency stop during a preset sequence stops immediately and returns IDLE."""
+    move_count = {"n": 0}
+    stop_after_first = threading.Event()
+
+    def move_impl(_sensors, _sensor_name, _target, ser, tolerance=2, timeout=30):
+        move_count["n"] += 1
+        if move_count["n"] == 1:
+            stop_after_first.set()
+            # Block until the test thread triggers emergency stop via the serial proxy
+            while True:
+                ser.write(b"x")
+                time.sleep(0.01)
+        return True
+
+    wrapper_module, motor_control = _load_wrapper_module(
+        move_impl=move_impl,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+    controller.presets[1] = {1: 90.0, 2: 200.0, 3: 300.0}
+
+    controller._mqtt_on_message(None, None, _Message(b"preset 1"))
+    assert _wait_for(lambda: stop_after_first.is_set())
+
+    controller._mqtt_on_message(None, None, _Message(b"emergency_stop"))
+    assert _wait_for(lambda: controller.system_state == wrapper_module.SystemState.IDLE)
+    motor_control.emergency_stop.assert_called()
+    # Only the first motor (M2) should have started; M3 and M1 must not have run
+    assert move_count["n"] == 1

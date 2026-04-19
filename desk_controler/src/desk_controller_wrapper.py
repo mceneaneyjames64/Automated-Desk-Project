@@ -719,52 +719,73 @@ class DeskControllerWrapper:
     def load_and_execute_preset(self, preset_id: int) -> bool:
         """
         Load and execute a preset.
-        
+
+        Motors are moved one at a time in the required order:
+          1. Motor 2 – keyboard height  (VL53L0X #0)
+          2. Motor 3 – monitor height   (VL53L0X #1)
+          3. Motor 1 – monitor tilt     (ADXL345)
+
+        An emergency stop can interrupt the sequence at any point.
+
         Parameters
         ----------
         preset_id : int
             Preset ID (1-3)
-        
+
         Returns
         -------
         bool
-            True if all motors reached target, False otherwise
+            True if all motors reached their target, False otherwise
         """
         try:
             if preset_id not in self.presets:
                 self.logger.error(f"Invalid preset ID: {preset_id}")
                 return False
-            
+
             preset = self.presets[preset_id]
-            
-            # Check if all positions are set
+
+            # Validate that all positions are set
             if None in preset.values():
                 self.logger.error(f"Preset {preset_id} is not fully configured")
                 return False
-            
+
             self.logger.info(f"Loading preset {preset_id}: {preset}")
             self.system_state = SystemState.MOVING
-            
-            # Move each motor to target position sequentially
+
+            # Required movement order: keyboard height → monitor height → monitor tilt
             all_success = True
-            for motor_id in sorted(preset.keys()):
+            for motor_id in [2, 3, 1]:
+                # Allow emergency stop to abort between motor movements
+                if self.motor_stop_event.is_set():
+                    self.logger.warning(f"Preset {preset_id} interrupted by emergency stop")
+                    self.system_state = SystemState.IDLE
+                    return False
+
                 target_pos = preset[motor_id]
-                self.logger.info(f"  Moving motor {motor_id} to {target_pos} mm")
-                
+                unit = self._motor_unit(motor_id)
+                self.logger.info(f"  Moving motor {motor_id} to {target_pos} {unit}")
+
                 success = self.move_motor_to_position(motor_id, target_pos)
                 if not success:
                     all_success = False
-                    self.logger.error(f"  ✗ Motor {motor_id} failed to reach {target_pos} mm")
-            
+                    self.logger.error(
+                        f"  ✗ Motor {motor_id} failed to reach {target_pos} {unit}"
+                    )
+                    # If the failure was caused by an emergency stop, exit immediately
+                    if self.motor_stop_event.is_set():
+                        self.logger.warning(f"Preset {preset_id} interrupted by emergency stop")
+                        self.system_state = SystemState.IDLE
+                        return False
+
             if all_success:
                 self.logger.info(f"✓ Preset {preset_id} executed successfully")
                 self.system_state = SystemState.IDLE
             else:
                 self.logger.error(f"✗ Preset {preset_id} execution failed")
                 self.system_state = SystemState.ERROR
-            
+
             return all_success
-        
+
         except Exception as e:
             self.logger.error(f"Error loading preset {preset_id}: {e}")
             self.system_state = SystemState.ERROR
@@ -935,6 +956,32 @@ class DeskControllerWrapper:
                             target_pos
                         )
             
+            elif payload.startswith("save preset "):
+                # Preset save: "save preset 1", "save preset 2", "save preset 3"
+                try:
+                    preset_id = int(payload.split()[-1])
+                    if preset_id in self.presets:
+                        self.save_current_position_as_preset(preset_id)
+                    else:
+                        self.logger.warning(f"Invalid preset ID in message: {payload}")
+                except (ValueError, IndexError):
+                    self.logger.warning(f"Could not parse preset ID from message: {payload}")
+
+            elif payload.startswith("preset "):
+                # Preset load: "preset 1", "preset 2", "preset 3"
+                try:
+                    preset_id = int(payload.split()[-1])
+                    if preset_id in self.presets:
+                        self._start_motor_worker(
+                            f"preset-{preset_id}",
+                            self.load_and_execute_preset,
+                            preset_id,
+                        )
+                    else:
+                        self.logger.warning(f"Invalid preset ID in message: {payload}")
+                except (ValueError, IndexError):
+                    self.logger.warning(f"Could not parse preset ID from message: {payload}")
+
             elif payload.startswith("preset_") and not payload.endswith("_save"):
                 # Preset load: "preset_one", "preset_two", "preset_three"
                 preset_names = {"one": 1, "two": 2, "three": 3}
@@ -946,7 +993,7 @@ class DeskControllerWrapper:
                         self.load_and_execute_preset,
                         preset_id
                     )
-            
+
             elif payload.startswith("set_preset_"):
                 # Preset save: "set_preset_one", "set_preset_two", "set_preset_three"
                 preset_names = {"one": 1, "two": 2, "three": 3}
