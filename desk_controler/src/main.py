@@ -152,19 +152,12 @@ def handle_preset_load(controller: DeskControllerWrapper, preset_id: int):
 def handle_preset_save(controller: DeskControllerWrapper, preset_id: int):
     """Handle preset save command."""
     try:
-        current_positions = controller.motor_positions
-        
-        # Check if all positions are known
-        if None in current_positions.values():
-            print(f"✗ Cannot save preset: not all motor positions are known")
-            print(f"  Current: M1={current_positions[1]}, M2={current_positions[2]}, M3={current_positions[3]}")
-            return
-        
         print(f"\n→ Saving current position as preset {preset_id}...")
-        print(f"  Positions: M1={current_positions[1]}mm, M2={current_positions[2]}mm, M3={current_positions[3]}mm")
         
         if controller.save_current_position_as_preset(preset_id):
+            current_positions = controller.motor_positions
             print(f"✓ Preset {preset_id} saved successfully")
+            print(f"  Positions: M1={current_positions[1]}, M2={current_positions[2]}, M3={current_positions[3]}")
         else:
             print(f"✗ Failed to save preset {preset_id}")
     
