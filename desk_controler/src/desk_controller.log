@@ -112,3 +112,73 @@
 [2026-04-12 16:07:50] [WARNING] EMERGENCY STOP - All motors disabled
 [2026-04-12 16:07:50] [ERROR] Error during emergency stop: Attempting to use a port that is not open
 [2026-04-12 16:07:50] [INFO] ✓ Shutdown complete
+[2026-04-23 08:50:58] [INFO] DeskControllerWrapper initialized
+[2026-04-23 08:50:58] [INFO] Initializing hardware...
+[2026-04-23 08:50:59] [INFO] Calibration data loaded
+[2026-04-23 08:50:59] [INFO] ✓ Hardware initialized successfully
+[2026-04-23 08:50:59] [INFO] ✓ Presets loaded from desk_presets.json
+[2026-04-23 08:50:59] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-23 08:50:59] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:50:59] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:01] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:01] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:03] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:03] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:04] [INFO] Reading all sensors for preset 1...
+[2026-04-23 08:51:04] [ERROR] Error reading calibrated sensor adxl345: Sensor 'adxl345' not found in config.OFFSET
+[2026-04-23 08:51:04] [INFO] ✓ Presets saved to desk_presets.json
+[2026-04-23 08:51:04] [INFO] ✓ Preset 1 saved: {1: 89.77089453476235, 2: 177.033, 3: 386.333}
+[2026-04-23 08:51:07] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:07] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:13] [INFO] Moving motor 1 to 1.0 deg
+[2026-04-23 08:51:16] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:16] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:24] [INFO] Shutting down controller...
+[2026-04-23 08:51:24] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-23 08:51:24] [INFO] Serial port closed
+[2026-04-23 08:51:24] [INFO] ✓ Shutdown complete
+[2026-04-23 08:51:24] [INFO] Shutting down controller...
+[2026-04-23 08:51:24] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-23 08:51:24] [ERROR] Error during emergency stop: Attempting to use a port that is not open
+[2026-04-23 08:51:24] [INFO] ✓ Shutdown complete
+[2026-04-23 08:51:27] [INFO] DeskControllerWrapper initialized
+[2026-04-23 08:51:27] [INFO] Initializing hardware...
+[2026-04-23 08:51:28] [INFO] Calibration data loaded
+[2026-04-23 08:51:28] [INFO] ✓ Hardware initialized successfully
+[2026-04-23 08:51:28] [INFO] ✓ Presets loaded from desk_presets.json
+[2026-04-23 08:51:28] [INFO] ✓ MQTT connection initiated to 192.168.1.138
+[2026-04-23 08:51:28] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:28] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:30] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:30] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:32] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:32] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:37] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:37] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:40] [INFO] Moving motor 2 to 100.0 mm
+[2026-04-23 08:51:45] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:51:45] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:51:45] [INFO] ✓ Motor 2 reached 100.0 mm
+[2026-04-23 08:51:50] [INFO] Moving motor 3 to 50.0 mm
+[2026-04-23 08:52:00] [INFO] ✓ Motor 3 reached 50.0 mm
+[2026-04-23 08:52:01] [INFO] ✓ MQTT connected (reason code: Not authorized)
+[2026-04-23 08:52:01] [WARNING] MQTT disconnected (reason code: Unspecified error)
+[2026-04-23 08:52:04] [INFO] Loading preset 1: {1: 89.77089453476235, 2: 177.033, 3: 386.333}
+[2026-04-23 08:52:04] [INFO]   Moving motor 2 to 177.033 mm
+[2026-04-23 08:52:04] [INFO] Moving motor 2 to 177.033 mm
+[2026-04-23 08:52:10] [INFO] ✓ Motor 2 reached 177.033 mm
+[2026-04-23 08:52:10] [INFO]   Moving motor 3 to 386.333 mm
+[2026-04-23 08:52:10] [INFO] Moving motor 3 to 386.333 mm
+[2026-04-23 08:52:21] [INFO] ✓ Motor 3 reached 386.333 mm
+[2026-04-23 08:52:21] [INFO]   Moving motor 1 to 89.77089453476235 deg
+[2026-04-23 08:52:21] [INFO] Moving motor 1 to 89.77089453476235 deg
+[2026-04-23 08:52:21] [INFO] ✓ Motor 1 reached 89.77089453476235 deg
+[2026-04-23 08:52:21] [INFO] ✓ Preset 1 executed successfully
+[2026-04-23 08:52:32] [INFO] Shutting down controller...
+[2026-04-23 08:52:32] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-23 08:52:32] [INFO] Serial port closed
+[2026-04-23 08:52:32] [INFO] ✓ Shutdown complete
+[2026-04-23 08:52:32] [INFO] Shutting down controller...
+[2026-04-23 08:52:32] [WARNING] EMERGENCY STOP - All motors disabled
+[2026-04-23 08:52:32] [ERROR] Error during emergency stop: Attempting to use a port that is not open
+[2026-04-23 08:52:32] [INFO] ✓ Shutdown complete
