@@ -2,12 +2,9 @@
 
 import asyncio
 #import paho.mqtt.client as paho
-import json
-import os
 from aiomqtt import Client, MqttError
 
 pending_acks = {}
-PRESET_FILE = "desk_presets.json"
 
 # MQTT broker settings.
 MQTT_BROKER = "192.168.1.138" # Broker IP
@@ -15,7 +12,6 @@ MQTT_PORT = 1883
 CMD_TOPIC = "home/desk/command"
 STATUS_TOPIC = "home/desk/status"
 SERVER_STATUS_TOPIC = "home/server/status"
-SERVER_CMD_TOPIC = "home/server/presets"
 MQTT_USERNAME = "eceMos" # Broker username
 MQTT_PASSWORD = "eceMos1" # Broker password
 
@@ -32,53 +28,6 @@ current_position_percents = {
     2: None,
     3: None,
 }
-
-# Stored preset positions
-preset_positions = {
-    1: {1: None, 2: None, 3: None},
-    2: {1: None, 2: None, 3: None},
-    3: {1: None, 2: None, 3: None},
-}
-
-
-# Loads saved preset positions from JSON file.
-def load_presets():
-    global preset_positions
-
-    if os.path.exists(PRESET_FILE):
-        try:
-            # Protected file read so corrupted JSON or file issues
-            # do not stop the program during startup.
-            with open(PRESET_FILE, "r") as f:
-                data = json.load(f)
-
-                # Convert JSON string keys back to integers
-                preset_positions = {
-                    int(p): {int(m): v for m, v in motors.items()}
-                    for p, motors in data.items()
-                }
-
-            print("Presets loaded from JSON file.")
-
-        except (OSError, json.JSONDecodeError, ValueError, TypeError) as e:
-            # Fall back to default in-memory presets if the file cannot be used.
-            print(f"Failed to load presets: {e}")
-            print("Using default preset values.")
-    else:
-        print("No preset file found, using defaults.")
-
-
-# Function to save current actuator positions to a JSON file.
-def save_presets():
-    try:
-        # Protected file write so disk/permission issues do not crash the program.
-        with open(PRESET_FILE, "w") as f:
-            json.dump(preset_positions, f, indent=4)
-
-        print("Presets saved to JSON file.")
-
-    except OSError as e:
-        print(f"Failed to save presets: {e}")
     
 ################################################################################
 #                       MQTT POSITION PUBLISHING
@@ -164,46 +113,6 @@ async def monitor_tilt_up(client):
 
 async def monitor_tilt_down(client):
     print("One-shot: Monitor Tilt Down")
-
-async def preset_one(client):
-    print("Preset One...")
-    await run_preset_sequence(client, 1)
-
-async def preset_two(client):
-    print("Preset Two...")
-    await run_preset_sequence(client, 2)
-
-async def preset_three(client):
-    print("Preset Three...")
-    await run_preset_sequence(client, 3)
-
-# Function to save current actuator positions as a preset.
-async def save_current_preset(preset_number):
-    try:
-        print(f"Set Preset {preset_number}...")
-
-        # Only save when all three actuator positions are known.
-        if None in current_positions.values():
-            print(f"Cannot save Preset {preset_number}: one or more actuator positions are unknown.")
-            return
-
-        preset_positions[preset_number] = current_positions.copy()
-        save_presets()
-        print(f"Preset {preset_number} saved: {preset_positions[preset_number]}")
-
-    except asyncio.CancelledError:
-        raise
-    except Exception as e:
-        print(f"Error setting preset {preset_number}: {e}")
-
-async def set_preset_one(client):
-    await save_current_preset(1)
-
-async def set_preset_two(client):
-    await save_current_preset(2)
-
-async def set_preset_three(client):
-    await save_current_preset(3)
     
 async def calibrate(client):
     print("Calibrate...")
@@ -240,12 +149,6 @@ ONE_SHOT_COMMANDS = {
     "keyboard_down": keyboard_down,
     "monitor_tilt_up": monitor_tilt_up,
     "monitor_tilt_down": monitor_tilt_down,
-    "preset_one": preset_one,
-    "preset_two": preset_two,
-    "preset_three": preset_three,
-    "set_preset_one": set_preset_one,
-    "set_preset_two": set_preset_two,
-    "set_preset_three": set_preset_three,
     "calibrate": calibrate,
     "emergency_stop": emergency_stop,
 }
@@ -263,7 +166,6 @@ CONTINUOUS_COMMANDS = {
 continuous_tasks = {}
 CONTINUOUS_TIMEOUT = 0.3
 HEARTBEAT_TIMEOUT = 120.0
-preset_lock = asyncio.Lock() # Ensures preset sequence cannot be interrupted by another preset call
 
 # Global variable to track last heartbeat
 last_heartbeat_time = None
@@ -470,57 +372,11 @@ async def send_and_wait(client, command_payload: str, expected_ack: str, timeout
     print(f"FAILED after {retries} attempts: {command_payload}")
     return False
 
-# Runs the preset sequence so each actuator moves to postion one at a time 
-async def run_preset_sequence(client, preset_number: int):
-    
-    if preset_lock.locked():
-        print("Preset already running — ignoring new request.")
-        return
-
-    try:
-        async with preset_lock:
-
-            preset = preset_positions[preset_number]
-
-            if None in preset.values():
-                print(f"Preset {preset_number} is not fully set!")
-                return
-
-            # Move actuators one at a time and wait for each acknowledgement
-            # before sending the next actuator command.
-            sequence = [
-                (1, "m1"),
-                (2, "m2"),
-                (3, "m3"),
-            ]
-
-            for actuator_id, motor_name in sequence:
-
-                target_position = preset[actuator_id]
-                move_cmd = f"{motor_name}-move-{target_position}"
-                expected_ack = f"{motor_name}_done"
-
-                print(f"Moving {motor_name} to {target_position}")
-                success = await send_and_wait(client, move_cmd, expected_ack)
-
-                if not success:
-                    print(f"Stopping preset {preset_number} due to failure on {motor_name}.")
-                    return
-
-            print(f"Preset {preset_number} sequence complete.")
-
-    except asyncio.CancelledError:
-        raise
-    except Exception as e:
-        print(f"Unexpected error in run_preset_sequence for preset {preset_number}: {e}")
-
 ################################################################################
 #                           MAIN ENTRY POINT
 ################################################################################
 
 async def main():
-    
-    load_presets()
     
     while True:
         try:
