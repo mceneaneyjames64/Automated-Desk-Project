@@ -249,11 +249,21 @@ def test_preset_load_mqtt_message_numeric_format():
 
 
 def test_save_preset_mqtt_message_numeric_format(tmp_path):
-    """MQTT 'save preset 1' message saves current positions to preset."""
+    """MQTT 'save preset 3' reads live sensors and saves their values as the preset."""
     wrapper_module, _ = _load_wrapper_module(
         move_impl=lambda *_args, **_kwargs: True,
         retract_impl=lambda *_args, **_kwargs: True,
     )
+
+    import importlib
+    cfg = importlib.import_module("config")
+
+    # Map each sensor constant to its expected reading
+    sensor_values = {
+        cfg.SENSOR_ADXL:   80.0,
+        cfg.SENSOR_VL53_0: 180.0,
+        cfg.SENSOR_VL53_1: 280.0,
+    }
 
     presets_file = str(tmp_path / "test_presets.json")
     controller = wrapper_module.DeskControllerWrapper(
@@ -262,11 +272,47 @@ def test_save_preset_mqtt_message_numeric_format(tmp_path):
     )
     controller.is_initialized = True
     controller.serial_port = Mock()
-    controller.motor_positions = {1: 80.0, 2: 180.0, 3: 280.0}
+    # motor_positions intentionally left as {1: None, 2: None, 3: None} to
+    # confirm that the method no longer relies on cached values
+    controller.read_sensor_calibrated = lambda sensor_name: sensor_values[sensor_name]
 
     controller._mqtt_on_message(None, None, _Message(b"save preset 3"))
 
     assert controller.presets[3] == {1: 80.0, 2: 180.0, 3: 280.0}
+    # motor_positions should also be updated with the fresh sensor readings
+    assert controller.motor_positions == {1: 80.0, 2: 180.0, 3: 280.0}
+
+
+def test_save_preset_fails_when_sensor_read_returns_none(tmp_path):
+    """save_current_position_as_preset returns False when any sensor read fails."""
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=lambda *_args, **_kwargs: True,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    import importlib
+    cfg = importlib.import_module("config")
+
+    # Simulate one sensor failing by returning None
+    def failing_sensor_read(sensor_name):
+        if sensor_name == cfg.SENSOR_VL53_1:
+            return None
+        return 100.0
+
+    presets_file = str(tmp_path / "test_presets.json")
+    controller = wrapper_module.DeskControllerWrapper(
+        presets_file=presets_file,
+        log_file=None,
+    )
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+    controller.read_sensor_calibrated = failing_sensor_read
+
+    result = controller.save_current_position_as_preset(1)
+
+    assert result is False
+    # Preset should remain unconfigured
+    assert controller.presets[1] == {1: None, 2: None, 3: None}
 
 
 def test_preset_load_emergency_stop_interrupts_sequence():

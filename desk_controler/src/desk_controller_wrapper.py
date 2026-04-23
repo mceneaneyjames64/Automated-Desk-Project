@@ -683,13 +683,19 @@ class DeskControllerWrapper:
     
     def save_current_position_as_preset(self, preset_id: int) -> bool:
         """
-        Save current motor positions as a preset.
-        
+        Save current motor positions as a preset by reading all sensors directly.
+
+        Reads fresh calibrated sensor values for all three motors instead of
+        relying on cached motor_positions:
+        - Motor 1 (M1): ADXL345 tilt angle via config.SENSOR_ADXL
+        - Motor 2 (M2): VL53L0X #0 distance via config.SENSOR_VL53_0
+        - Motor 3 (M3): VL53L0X #1 distance via config.SENSOR_VL53_1
+
         Parameters
         ----------
         preset_id : int
             Preset ID (1-3)
-        
+
         Returns
         -------
         bool
@@ -699,19 +705,33 @@ class DeskControllerWrapper:
             if preset_id not in self.presets:
                 self.logger.error(f"Invalid preset ID: {preset_id}")
                 return False
-            
-            # Check that all positions are known
+
+            self.logger.info(f"Reading all sensors for preset {preset_id}...")
+
+            # Read calibrated sensor values for all three motors
+            sensor_readings = {
+                1: self.read_sensor_calibrated(config.SENSOR_ADXL),
+                2: self.read_sensor_calibrated(config.SENSOR_VL53_0),
+                3: self.read_sensor_calibrated(config.SENSOR_VL53_1),
+            }
+
+            # Verify all readings are valid
+            failed_motors = [m_id for m_id, reading in sensor_readings.items() if reading is None]
+            if failed_motors:
+                self.logger.error(
+                    f"Cannot save preset {preset_id}: failed to read sensors for motors {failed_motors}"
+                )
+                return False
+
+            # Update motor_positions with fresh readings and save preset
             with self.position_lock:
-                if None in self.motor_positions.values():
-                    self.logger.error(f"Cannot save preset {preset_id}: not all positions known")
-                    return False
-                
-                self.presets[preset_id] = self.motor_positions.copy()
-            
+                self.motor_positions.update(sensor_readings)
+                self.presets[preset_id] = sensor_readings.copy()
+
             self.save_presets_to_file()
             self.logger.info(f"✓ Preset {preset_id} saved: {self.presets[preset_id]}")
             return True
-        
+
         except Exception as e:
             self.logger.error(f"Error saving preset {preset_id}: {e}")
             return False
