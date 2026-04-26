@@ -962,10 +962,13 @@ class DeskControllerWrapper:
     
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         """MQTT connection callback."""
-        with self.mqtt_lock:
-            self.mqtt_connected = True
-        self.logger.info(f"✓ MQTT connected (return code: {rc})")
-        client.subscribe(self.mqtt_config["command_topic"], 1)
+        if rc == 0:
+            with self.mqtt_lock:
+                self.mqtt_connected = True
+            self.logger.info(f"✓ MQTT connected (return code: {rc})")
+            client.subscribe(self.mqtt_config["command_topic"], 1)
+        else:
+            self.logger.error(f"✗ MQTT connection refused (return code: {rc})")
     
     def _mqtt_on_message(self, client, userdata, message):
         """MQTT message callback.
@@ -1315,8 +1318,8 @@ def main():
         # Print status
         controller.print_system_status()
         
-        # Example: Move motor 1 to 200mm
-        print("Example: Moving motor 1 to 200mm...")
+        # Example: Move motor 1 to 200 degrees
+        print("Example: Moving motor 1 to 200 degrees...")
         if controller.move_motor_to_position(1, 200):
             print("✓ Motor 1 moved successfully")
         
