@@ -22,7 +22,7 @@ controller = None
 
 
 def signal_handler(signum, frame):
-    """Handle Ctrl+C gracefully."""
+    """Handle Ctrl+C gracefully by shutting down hardware before exit."""
     print("\n\n✓ Shutdown requested...")
     if controller:
         controller.shutdown()
@@ -62,7 +62,7 @@ def print_menu():
 
 
 def get_position_input(motor_id: int) -> float:
-    """Get position input from user."""
+    """Prompt the user for a target position and validate it against config limits."""
     while True:
         try:
             position = input(f"\nEnter target position for motor {motor_id} (mm): ").strip()

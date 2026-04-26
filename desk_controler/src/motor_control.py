@@ -61,6 +61,11 @@ def _read_corrected(sensors: dict, sensor_name: str) -> float:
     Applies config.OFFSET[sensor_name] to the raw reading.  If no offset
     entry exists (calibration not yet run) the raw reading is returned and a
     warning is printed.
+
+    The offset is a software correction produced by the VL53L0X calibration
+    routine (calibrate_vl53_sensors).  It compensates for the physical gap
+    between the sensor face and the actuator zero-point so that position
+    commands work in real-world millimetres rather than raw sensor distances.
     """
     raw = get_sensor_value(sensors, sensor_name)
     offset = getattr(config, "OFFSET", {}).get(sensor_name)
@@ -109,6 +114,9 @@ def move_to_distance(sensors: dict, sensor_name: str, target_mm: float,
 
     start_time = time.monotonic()
 
+    # Bang-bang (on/off) closed-loop control: read the corrected sensor distance,
+    # compute the signed error, and drive the actuator in the correcting direction
+    # until the error falls within tolerance or the timeout expires.
     while True:
         if time.monotonic() - start_time > timeout:
             ser.write(config.CMD_ALL_OFF)
@@ -300,20 +308,12 @@ def retract_tilt(sensors: dict, ser, timeout: float = 30) -> bool:
 # ---------------------------------------------------------------------------
 
 def emergency_stop(ser) -> None:
-    """Send an immediate stop command to all motors."""
-    _send_all_off(ser, "[motor] EMERGENCY STOP — all motors disabled.")
+    """Send an immediate stop command to all motors.
 
-
-def stop(ser) -> None:
-    """Send a normal stop command to all motors.
-
-    This intentionally sends the same hardware command as emergency_stop.
-    The only difference in this module is logging/message semantics.
+    Writes CMD_ALL_OFF to the serial bus, cutting power to every motor
+    simultaneously.  This is the single authoritative stop path — all other
+    stop-like requests (MQTT "stop" payload, InterruptedError from
+    _InterruptibleSerialProxy, etc.) ultimately resolve to this call.
     """
-    _send_all_off(ser, "[motor] Stop requested — all motors halted.")
-
-
-def _send_all_off(ser, message: str) -> None:
-    """Send the all-off command and emit a status message."""
     ser.write(config.CMD_ALL_OFF)
-    print(message)
+    print("[motor] EMERGENCY STOP — all motors disabled.")

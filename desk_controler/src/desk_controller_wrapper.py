@@ -234,7 +234,18 @@ class DeskControllerWrapper:
         # Calibration state
         self.calibration_data = load_calibration()
         
-        # Locks for thread-safe operations
+        # Thread-safety locks.
+        # position_lock  – guards motor_positions (read/written from the motor
+        #                  worker thread and the MQTT callback thread).
+        # mqtt_lock      – serialises mqtt_client.publish() calls so that
+        #                  concurrent feedback publications don't interleave.
+        # motor_command_lock – binary semaphore that prevents two motor
+        #                  movements from running at the same time; acquired
+        #                  before starting a worker thread and released inside
+        #                  _run_motor_worker when the task finishes.
+        # motor_stop_event – threading.Event that _InterruptibleSerialProxy
+        #                  polls on every write; set by emergency_stop_all()
+        #                  to interrupt any in-progress movement immediately.
         self.position_lock = threading.Lock()
         self.mqtt_lock = threading.Lock()
         self.motor_command_lock = threading.Lock()
@@ -382,7 +393,13 @@ class DeskControllerWrapper:
         }.get(motor_id)
     
     def _run_motor_worker(self, task_name: str, task_fn, *args):
-        """Run motor operation in a background worker thread."""
+        """Execute a motor task and release the command lock when done.
+
+        Runs on a dedicated background daemon thread started by
+        _start_motor_worker.  Ensures motor_command_lock is always released
+        even if the task raises an exception, preventing the controller from
+        getting stuck in a "busy" state.
+        """
         try:
             task_fn(*args)
         except Exception as e:
@@ -401,7 +418,15 @@ class DeskControllerWrapper:
         return True
 
     def _start_motor_worker(self, task_name: str, task_fn, *args) -> bool:
-        """Start a worker thread for motor operations."""
+        """Start a worker thread for motor operations.
+
+        Attempts a non-blocking acquire of motor_command_lock so that only
+        one actuator operation runs at a time.  If the lock is already held
+        (another motor is moving) the command is rejected and False is
+        returned.  On success, motor_stop_event is cleared so that
+        _InterruptibleSerialProxy allows serial writes through, and a daemon
+        thread is spawned to run the task.
+        """
         if not self.motor_command_lock.acquire(blocking=False):
             self.logger.warning(f"Ignoring '{task_name}' command: another actuator is moving")
             self.publish_status("busy")
@@ -608,7 +633,13 @@ class DeskControllerWrapper:
     def emergency_stop_all(self) -> bool:
         """
         Emergency stop all motors.
-        
+
+        Sets motor_stop_event, which causes _InterruptibleSerialProxy to raise
+        InterruptedError on the very next serial write inside any running motor
+        worker thread.  The hardware CMD_ALL_OFF command is then sent directly
+        on the real serial port (bypassing the proxy) so the actuators halt
+        even if no worker thread is currently active.
+
         Returns
         -------
         bool
@@ -919,7 +950,24 @@ class DeskControllerWrapper:
         client.subscribe(self.mqtt_config["command_topic"], 1)
     
     def _mqtt_on_message(self, client, userdata, message):
-        """MQTT message callback."""
+        """MQTT message callback.
+
+        Routes incoming command payloads to the appropriate handler.  All
+        motor-movement commands are dispatched to background worker threads
+        (via _start_motor_movement_worker) so that this callback returns
+        immediately and does not block the MQTT network loop.
+
+        Routing order (first match wins):
+          "Heartbeat"           – publish heartbeat_ok status.
+          "Feedback{N}:{v}"    – update cached motor position under position_lock.
+          "m{N} -> up|down|…"  – start a motor movement worker.
+          "save preset {N}"    – save current sensor readings as preset N.
+          "preset {N}"         – execute preset N in a worker thread.
+          "preset_{word}"      – execute named preset (one/two/three).
+          "set_preset_{word}"  – save named preset.
+          "emergency_stop"     – halt all motors immediately.
+          "calibrate"          – run calibration in a worker thread.
+        """
         try:
             payload = message.payload.decode().strip()
             self.logger.debug(f"MQTT message received: {payload}")
@@ -1071,7 +1119,11 @@ class DeskControllerWrapper:
     def publish_position_feedback(self, motor_id: int) -> bool:
         """
         Publish position feedback for a motor.
-        
+
+        Called immediately after each successful motor movement so that the
+        MQTT broker (and any subscribers such as Home Assistant) receive an
+        up-to-date position reading without waiting for a periodic poll.
+
         Parameters
         ----------
         motor_id : int
@@ -1102,14 +1154,6 @@ class DeskControllerWrapper:
         except Exception as e:
             self.logger.error(f"Error publishing feedback for M{motor_id}: {e}")
             return False
-    
-    def publish_all_position_feedback(self) -> bool:
-        """Publish position feedback for all motors."""
-        success = True
-        for motor_id in [1, 2, 3]:
-            if not self.publish_position_feedback(motor_id):
-                success = False
-        return success
     
     ################################################################################
     #                           STATUS & MONITORING

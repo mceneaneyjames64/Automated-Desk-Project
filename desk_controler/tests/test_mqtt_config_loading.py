@@ -28,7 +28,6 @@ def _install_mqtt_stubs():
     fake_motor_control.move_to_distance = lambda *_args, **_kwargs: True
     fake_motor_control.retract_fully = lambda *_args, **_kwargs: True
     fake_motor_control.emergency_stop = Mock()
-    fake_motor_control.stop = Mock()
     sys.modules["motor_control"] = fake_motor_control
 
     fake_calibration = types.ModuleType("calibration")
@@ -78,6 +77,7 @@ def test_mqtt_parameters_are_loaded_from_config_at_import_time(monkeypatch):
 
 
 def test_stop_payload_calls_normal_stop_handler():
+    """The 'stop' MQTT payload must halt motors via emergency_stop (stop() was removed)."""
     mqtt_module, fake_motor_control, _ = _import_mqtt_with_stubs()
 
     mqtt_module.motor_serial_port = object()
@@ -86,7 +86,7 @@ def test_stop_payload_calls_normal_stop_handler():
 
     mqtt_module.on_message(client, None, message)
 
-    fake_motor_control.stop.assert_called_once_with(mqtt_module.motor_serial_port)
+    fake_motor_control.emergency_stop.assert_called_once_with(mqtt_module.motor_serial_port)
     client.publish.assert_called_with(mqtt_module.TOPIC_STATUS, "STOP")
 
 

@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional
 
 import config
 from calibration import calibrate_vl53_sensors
-from motor_control import move_to_distance, retract_fully, emergency_stop, stop
+from motor_control import move_to_distance, retract_fully, emergency_stop
 
 
 ################################################################################
@@ -250,11 +250,14 @@ def handle_emergency_stop(client: mqtt.Client):
 
 
 def handle_stop(client: mqtt.Client):
-    """Handle normal stop command."""
+    """Handle normal stop command.
+
+    Delegates to emergency_stop — both send the same all-off hardware command.
+    """
     try:
         print("  → STOP - Gracefully halting motors")
         client.publish(TOPIC_STATUS, "STOP")
-        stop(_require_motor_serial_port("stop"))
+        emergency_stop(_require_motor_serial_port("stop"))
     except Exception as e:
         print(f"✗ Error in handle_stop: {e}")
 
@@ -307,7 +310,18 @@ def on_connect(client: mqtt.Client, userdata, flags, reason, properties):
 def on_message(client: mqtt.Client, userdata, message):
     """
     Callback when MQTT message is received.
-    FIXED: Proper indentation of message handling
+
+    Message routing order (first match wins):
+      1. "Heartbeat"           – acknowledged and discarded.
+      2. "Feedback{N}:{v}"    – updates in-memory motor position for motor N.
+      3. "m{N} -> …"          – motor commands (not supported here; use
+                                 DeskControllerWrapper for hardware access).
+      4. "preset_{word}"      – loads a named preset (one/two/three).
+      5. "set_preset_{word}"  – saves current positions as a named preset.
+      6. "emergency_stop"     – halts all motors via emergency_stop().
+      7. "stop"               – halts all motors via emergency_stop().
+      8. "calibrate"          – runs VL53L0X calibration routine.
+      9. (anything else)      – logged as unknown.
     """
     try:
         payload = message.payload.decode().strip()
@@ -338,18 +352,26 @@ def on_message(client: mqtt.Client, userdata, message):
         # ────────────────────────────────────────────────────────────────────
         # Motor commands: "m{id} -> {direction|position}"
         # Examples: "m1 -> up", "m1 -> down", "m1 -> 200"
+        #
+        # NOTE: Direct motor movement requires hardware access (serial port,
+        # sensors) that is managed by DeskControllerWrapper.  This standalone
+        # MQTT module does not have that context, so motor commands arriving
+        # here are logged as unsupported.  Use DeskControllerWrapper for full
+        # motor-command handling.
         # ────────────────────────────────────────────────────────────────────
         if " -> " in payload:
             try:
                 parts = payload.split("->")
                 motor_part = parts[0].strip()      # "m1", "m2", "m3"
-                direction_part = parts[1].strip()  # "up", "down", or position
-                
+
                 # Extract motor ID from "m{id}"
                 if motor_part.startswith("m"):
                     motor_id = int(motor_part[1:])
                     if motor_id in [1, 2, 3]:
-                        handle_motor_move(client, motor_id, direction_part)
+                        print(
+                            f"⚠ Motor command '{payload}' requires "
+                            "DeskControllerWrapper for execution — ignored."
+                        )
                     else:
                         print(f"✗ Invalid motor ID: {motor_id}")
                 else:
