@@ -1306,6 +1306,7 @@ class DeskControllerWrapper:
 
             # Stop the command dispatcher
             self._cmd_queue.put(None)
+            self._cmd_dispatcher_thread.join(timeout=5.0)
             
             # Stop motors
             self.emergency_stop_all()

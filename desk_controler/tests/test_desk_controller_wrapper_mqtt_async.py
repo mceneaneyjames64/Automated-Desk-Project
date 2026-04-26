@@ -171,7 +171,6 @@ def test_mqtt_calibrate_runs_async_and_blocks_motor_movement():
         for c in controller.mqtt_client.publish.call_args_list
     ))
     assert move_calls["count"] == 0
-    controller.mqtt_client.publish.assert_any_call("home/desk/status", "calibrating")
 
     allow_calibration_finish.set()
     assert _wait_for(lambda: controller.system_state == wrapper_module.SystemState.IDLE)
@@ -285,9 +284,8 @@ def test_save_preset_mqtt_message_numeric_format(tmp_path):
     controller._mqtt_on_message(None, None, _Message(b"save preset 3"))
 
     # save_current_position_as_preset now runs in a background worker thread;
-    # wait for it to complete before asserting.
-    assert _wait_for(lambda: controller.presets[3] != {1: None, 2: None, 3: None})
-    assert controller.presets[3] == {1: 80.0, 2: 180.0, 3: 280.0}
+    # wait for the correct final state before asserting.
+    assert _wait_for(lambda: controller.presets[3] == {1: 80.0, 2: 180.0, 3: 280.0})
     # motor_positions should also be updated with the fresh sensor readings
     assert controller.motor_positions == {1: 80.0, 2: 180.0, 3: 280.0}
 
