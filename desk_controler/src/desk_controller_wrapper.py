@@ -1155,6 +1155,35 @@ class DeskControllerWrapper:
             self.logger.error(f"Error publishing feedback for M{motor_id}: {e}")
             return False
     
+    def publish_all_position_feedback(self) -> bool:
+        """
+        Publish position feedback for all motors.
+
+        Publishes the current position of all three motors to their respective
+        MQTT feedback topics. This is typically called by the heartbeat loop
+        to keep Home Assistant or other subscribers updated with the latest
+        motor positions.
+
+        Returns
+        -------
+        bool
+            True if all motors published successfully, False otherwise
+        """
+        try:
+            if not self.mqtt_connected or self.mqtt_client is None:
+                return False
+            
+            all_success = True
+            for motor_id in [1, 2, 3]:
+                if not self.publish_position_feedback(motor_id):
+                    all_success = False
+            
+            return all_success
+        
+        except Exception as e:
+            self.logger.error(f"Error publishing all position feedback: {e}")
+            return False
+    
     ################################################################################
     #                           STATUS & MONITORING
     ################################################################################
