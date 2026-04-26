@@ -401,11 +401,14 @@ class DeskControllerWrapper:
         getting stuck in a "busy" state.
         """
         try:
+            self.logger.debug(f"Motor worker '{task_name}' starting on thread {threading.current_thread().name}")
             task_fn(*args)
+            self.logger.debug(f"Motor worker '{task_name}' completed successfully")
         except Exception as e:
             self.logger.error(f"Motor worker '{task_name}' failed: {e}")
         finally:
             self.motor_command_lock.release()
+            self.logger.debug(f"Motor command lock released by worker '{task_name}'")
     
     def _reject_if_calibrating(self, publish_status: bool = False) -> bool:
         """Return True when movement should be rejected due to calibration state."""
@@ -428,10 +431,11 @@ class DeskControllerWrapper:
         thread is spawned to run the task.
         """
         if not self.motor_command_lock.acquire(blocking=False):
-            self.logger.warning(f"Ignoring '{task_name}' command: another actuator is moving")
+            self.logger.warning(f"Ignoring '{task_name}' command: motor_command_lock already held (another motor is moving)")
             self.publish_status("busy")
             return False
         
+        self.logger.debug(f"Motor command lock acquired for task '{task_name}'")
         self.motor_stop_event.clear()
         
         worker = threading.Thread(
@@ -443,8 +447,10 @@ class DeskControllerWrapper:
         
         try:
             worker.start()
+            self.logger.debug(f"Motor worker thread started for '{task_name}'")
         except Exception:
             self.motor_command_lock.release()
+            self.logger.error(f"Failed to start motor worker thread for '{task_name}'")
             raise
         
         return True
@@ -499,6 +505,7 @@ class DeskControllerWrapper:
             self.logger.info(f"Moving motor {motor_id} to {target_value} {unit}")
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             
             serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
             if motor_id == 1:
@@ -528,6 +535,7 @@ class DeskControllerWrapper:
                     self.motor_positions[motor_id] = target_value
                 self.motor_status[motor_id] = "idle"
                 self.logger.info(f"✓ Motor {motor_id} reached {target_value} {unit}")
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
                 
                 # Publish feedback
                 self.publish_position_feedback(motor_id)
@@ -541,6 +549,7 @@ class DeskControllerWrapper:
                 self.motor_status[motor_id] = "error"
                 self.system_state = SystemState.ERROR
                 self.logger.error(f"✗ Motor {motor_id} failed to reach {target_value} {unit}")
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
                 return False
         
         except InterruptedError:
@@ -548,12 +557,14 @@ class DeskControllerWrapper:
             if all(status != "moving" for status in self.motor_status.values()):
                 self.system_state = SystemState.IDLE
             self.logger.warning(f"Motor {motor_id} movement interrupted")
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             return False
         
         except Exception as e:
             self.logger.error(f"Error moving motor {motor_id}: {e}")
             self.motor_status[motor_id] = "error"
             self.system_state = SystemState.ERROR
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             return False
     
     def retract_motor_fully(self, motor_id: int, timeout: float = 30) -> bool:
@@ -587,6 +598,7 @@ class DeskControllerWrapper:
             self.logger.info(f"Retracting motor {motor_id} to minimum position")
             self.motor_status[motor_id] = "moving"
             self.system_state = SystemState.MOVING
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             
             serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
             if motor_id == 1:
@@ -603,6 +615,7 @@ class DeskControllerWrapper:
                     self.motor_positions[motor_id] = self._motor_min_target(motor_id)
                 self.motor_status[motor_id] = "idle"
                 self.logger.info(f"✓ Motor {motor_id} fully retracted")
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
                 
                 # Publish feedback
                 self.publish_position_feedback(motor_id)
@@ -615,6 +628,7 @@ class DeskControllerWrapper:
                 self.motor_status[motor_id] = "error"
                 self.system_state = SystemState.ERROR
                 self.logger.error(f"✗ Motor {motor_id} failed to retract")
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
                 return False
         
         except InterruptedError:
@@ -622,12 +636,14 @@ class DeskControllerWrapper:
             if all(status != "moving" for status in self.motor_status.values()):
                 self.system_state = SystemState.IDLE
             self.logger.warning(f"Motor {motor_id} retraction interrupted")
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             return False
         
         except Exception as e:
             self.logger.error(f"Error retracting motor {motor_id}: {e}")
             self.motor_status[motor_id] = "error"
             self.system_state = SystemState.ERROR
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             return False
     
     def emergency_stop_all(self) -> bool:
@@ -652,6 +668,7 @@ class DeskControllerWrapper:
             
             for motor_id in [1, 2, 3]:
                 self.motor_status[motor_id] = "stopped"
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             
             self.system_state = SystemState.IDLE
             self.publish_status("EMERGENCY STOP")
@@ -1016,13 +1033,16 @@ class DeskControllerWrapper:
                     elif direction_part.lower() == "stop":
                         self.emergency_stop_all()
                     else:
-                        target_pos = float(direction_part)
-                        self._start_motor_movement_worker(
-                            f"m{motor_id}-move",
-                            self.move_motor_to_position,
-                            motor_id,
-                            target_pos
-                        )
+                        try:
+                            target_pos = float(direction_part)
+                            self._start_motor_movement_worker(
+                                f"m{motor_id}-move",
+                                self.move_motor_to_position,
+                                motor_id,
+                                target_pos
+                            )
+                        except ValueError:
+                            self.logger.warning(f"Could not parse motor target position from: {payload}")
             
             elif payload.startswith("save preset "):
                 # Preset save: "save preset 1", "save preset 2", "save preset 3"
@@ -1206,6 +1226,7 @@ class DeskControllerWrapper:
             "motor_positions": positions,
             "motor_status": self.motor_status.copy(),
             "mqtt_connected": self.mqtt_connected,
+            "motor_lock_held": self.motor_command_lock.locked(),
             "timestamp": datetime.now().isoformat(),
         }
     
@@ -1219,6 +1240,7 @@ class DeskControllerWrapper:
         print(f"Initialized:      {status['initialized']}")
         print(f"System State:     {status['system_state']}")
         print(f"MQTT Connected:   {status['mqtt_connected']}")
+        print(f"Motor Lock Held:  {status['motor_lock_held']}")
         print(f"\nMotor Positions:")
         for motor_id, position in status['motor_positions'].items():
             status_str = status['motor_status'].get(motor_id, "unknown")
