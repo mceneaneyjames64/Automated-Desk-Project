@@ -1,4 +1,16 @@
 #!/home/jd/Dev/DeskControl/.venv/bin/python
+"""
+DEPRECATED — legacy/prototype controller.
+
+This file is a prototype that predates the current modular architecture.
+All functionality has been superseded by:
+  - desk_controler/src/desk_controller_wrapper.py  (unified controller)
+  - desk_controler/src/MQTT.py                     (MQTT handling)
+  - desk_controler/src/motor_control.py            (motor control)
+  - desk_controler/src/main.py                     (entry point)
+
+Do NOT use this file in production.  It is kept for historical reference only.
+"""
 
 import asyncio
 import paho.mqtt.client as paho
