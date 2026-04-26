@@ -18,6 +18,7 @@ import sys
 import time
 import json
 import os
+import queue
 import threading
 from typing import Dict, Optional, Tuple
 from enum import Enum
@@ -247,10 +248,21 @@ class DeskControllerWrapper:
         #                  polls on every write; set by emergency_stop_all()
         #                  to interrupt any in-progress movement immediately.
         self.position_lock = threading.Lock()
-        self.mqtt_lock = threading.Lock()
+        self._mqtt_state_lock = threading.Lock()   # guards mqtt_connected only
+        self.mqtt_lock = threading.Lock()           # serialises publish() calls only
         self.motor_command_lock = threading.Lock()
         self.motor_stop_event = threading.Event()
-        
+
+        # Command dispatch queue: _mqtt_on_message enqueues payloads here so the
+        # MQTT network-loop thread is never blocked by command processing.
+        self._cmd_queue: queue.Queue = queue.Queue()
+        self._cmd_dispatcher_thread = threading.Thread(
+            target=self._cmd_dispatcher_loop,
+            daemon=True,
+            name="cmd-dispatcher",
+        )
+        self._cmd_dispatcher_thread.start()
+
         self.logger.info("DeskControllerWrapper initialized")
     
     ################################################################################
@@ -963,20 +975,40 @@ class DeskControllerWrapper:
     def _mqtt_on_connect(self, client, userdata, flags, rc):
         """MQTT connection callback."""
         if rc == 0:
-            with self.mqtt_lock:
+            with self._mqtt_state_lock:
                 self.mqtt_connected = True
             self.logger.info(f"✓ MQTT connected (return code: {rc})")
             client.subscribe(self.mqtt_config["command_topic"], 1)
         else:
             self.logger.error(f"✗ MQTT connection refused (return code: {rc})")
     
-    def _mqtt_on_message(self, client, userdata, message):
-        """MQTT message callback.
+    def _cmd_dispatcher_loop(self):
+        """Background thread: drain the command queue and dispatch each payload.
 
-        Routes incoming command payloads to the appropriate handler.  All
-        motor-movement commands are dispatched to background worker threads
-        (via _start_motor_movement_worker) so that this callback returns
-        immediately and does not block the MQTT network loop.
+        A ``None`` sentinel stops the loop (sent by shutdown()).
+        """
+        while True:
+            try:
+                payload = self._cmd_queue.get()
+                if payload is None:          # shutdown sentinel
+                    break
+                self._dispatch_command(payload)
+            except Exception as e:
+                self.logger.error(f"Dispatcher error: {e}")
+
+    def _mqtt_on_message(self, client, userdata, message):
+        """Enqueue incoming MQTT payload for processing on the dispatcher thread.
+
+        Returns immediately so the paho network-loop thread is never stalled.
+        """
+        try:
+            payload = message.payload.decode().strip()
+            self._cmd_queue.put(payload)
+        except Exception as e:
+            self.logger.error(f"Error enqueuing MQTT message: {e}")
+
+    def _dispatch_command(self, payload: str):
+        """Route a decoded MQTT payload to the appropriate handler.
 
         Routing order (first match wins):
           "Heartbeat"           – publish heartbeat_ok status.
@@ -990,13 +1022,12 @@ class DeskControllerWrapper:
           "calibrate"          – run calibration in a worker thread.
         """
         try:
-            payload = message.payload.decode().strip()
             self.logger.debug(f"MQTT message received: {payload}")
-            
+
             # Handle different command types
             if payload == "Heartbeat":
                 self.publish_status("heartbeat_ok")
-            
+
             elif payload.startswith("Feedback"):
                 # Position feedback from motor controller
                 for motor_id in [1, 2, 3]:
@@ -1010,16 +1041,16 @@ class DeskControllerWrapper:
                         except ValueError:
                             pass
                         break
-            
+
             elif " -> " in payload:
                 # Motor command: "m{id} -> {direction|position}"
                 parts = payload.split("->")
                 motor_part = parts[0].strip()
                 direction_part = parts[1].strip()
-                
+
                 if motor_part.startswith("m"):
                     motor_id = int(motor_part[1:])
-                    
+
                     if direction_part.lower() == "up":
                         target = self._motor_max_target(motor_id)
                         self._start_motor_movement_worker(
@@ -1047,13 +1078,17 @@ class DeskControllerWrapper:
                             )
                         except ValueError:
                             self.logger.warning(f"Could not parse motor target position from: {payload}")
-            
+
             elif payload.startswith("save preset "):
                 # Preset save: "save preset 1", "save preset 2", "save preset 3"
                 try:
                     preset_id = int(payload.split()[-1])
                     if preset_id in self.presets:
-                        self.save_current_position_as_preset(preset_id)
+                        self._start_motor_worker(
+                            f"save-preset-{preset_id}",
+                            self.save_current_position_as_preset,
+                            preset_id,
+                        )
                     else:
                         self.logger.warning(f"Invalid preset ID in message: {payload}")
                 except (ValueError, IndexError):
@@ -1092,8 +1127,12 @@ class DeskControllerWrapper:
                 preset_word = payload.split("_")[-1]
                 preset_id = preset_names.get(preset_word)
                 if preset_id:
-                    self.save_current_position_as_preset(preset_id)
-            
+                    self._start_motor_worker(
+                        f"save-preset-{preset_id}",
+                        self.save_current_position_as_preset,
+                        preset_id,
+                    )
+
             elif payload == "emergency_stop":
                 self.emergency_stop_all()
 
@@ -1102,13 +1141,13 @@ class DeskControllerWrapper:
                     "calibrate",
                     self._run_calibration_worker,
                 )
-        
+
         except Exception as e:
             self.logger.error(f"Error processing MQTT message: {e}")
-    
+
     def _mqtt_on_disconnect(self, client, userdata, rc):
         """MQTT disconnection callback."""
-        with self.mqtt_lock:
+        with self._mqtt_state_lock:
             self.mqtt_connected = False
         self.logger.warning(f"MQTT disconnected (return code: {rc})")
     
@@ -1264,6 +1303,9 @@ class DeskControllerWrapper:
         """Shutdown the controller gracefully."""
         try:
             self.logger.info("Shutting down controller...")
+
+            # Stop the command dispatcher
+            self._cmd_queue.put(None)
             
             # Stop motors
             self.emergency_stop_all()
