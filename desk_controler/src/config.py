@@ -39,7 +39,10 @@ DISTANCE_SENSORS = (SENSOR_VL53_0, SENSOR_VL53_1)
 # =============================================================================
 # VL53L0X Sensor Configuration
 # =============================================================================
-VL53_TIMING_BUDGET = 100000   # microseconds
+# 33 ms is the VL53L0X factory default and a good speed/accuracy balance.
+# The previous value of 100 ms added 100 ms of latency to every sensor read
+# inside the motor control loop, making it respond 3× slower than necessary.
+VL53_TIMING_BUDGET = 33000    # microseconds
 VL53_RATE_LIMIT    = 0.25     # MCPS
 VL53_SIGMA_LIMIT   = 9        # millimetres
 
