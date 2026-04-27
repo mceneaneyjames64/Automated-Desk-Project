@@ -302,8 +302,7 @@ def on_connect(client: mqtt.Client, userdata, flags, reason, properties):
     print(f"✓ Connected to MQTT broker with reason code: {reason}")
     is_connected = True
     
-    # Subscribe to command topic (QoS 0 — fire-and-forget; avoids ACK round trips
-    # that added unnecessary latency on a local-LAN broker)
+    # QoS 0 — fire-and-forget; eliminates ACK round-trip latency on local LAN
     client.subscribe(TOPIC_COMMAND, 0)
     print(f"✓ Subscribed to topic: {TOPIC_COMMAND}")
 
