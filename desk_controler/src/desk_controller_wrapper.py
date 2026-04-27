@@ -978,7 +978,9 @@ class DeskControllerWrapper:
             with self._mqtt_state_lock:
                 self.mqtt_connected = True
             self.logger.info(f"✓ MQTT connected (return code: {rc})")
-            client.subscribe(self.mqtt_config["command_topic"], 1)
+            # QoS 0 — fire-and-forget; avoids ACK round trips that added
+            # unnecessary latency on a local-LAN broker
+            client.subscribe(self.mqtt_config["command_topic"], 0)
         else:
             self.logger.error(f"✗ MQTT connection refused (return code: {rc})")
     

@@ -302,8 +302,9 @@ def on_connect(client: mqtt.Client, userdata, flags, reason, properties):
     print(f"✓ Connected to MQTT broker with reason code: {reason}")
     is_connected = True
     
-    # Subscribe to command topic
-    client.subscribe(TOPIC_COMMAND, 1)
+    # Subscribe to command topic (QoS 0 — fire-and-forget; avoids ACK round trips
+    # that added unnecessary latency on a local-LAN broker)
+    client.subscribe(TOPIC_COMMAND, 0)
     print(f"✓ Subscribed to topic: {TOPIC_COMMAND}")
 
 
@@ -539,7 +540,7 @@ def main():
             try:
                 # Publish heartbeat
                 if mqtt_client is not None and is_connected:
-                    mqtt_client.publish(TOPIC_COMMAND, "Heartbeat")
+                    mqtt_client.publish(TOPIC_STATUS, "Heartbeat")
                     
                     # Publish current positions
                     publish_all_positions()
