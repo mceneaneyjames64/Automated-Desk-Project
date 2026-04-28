@@ -12,7 +12,7 @@ class _Message:
         self.payload = payload
 
 
-def _load_wrapper_module(move_impl, retract_impl, calibration_impl=None):
+def _load_wrapper_module(move_impl, retract_impl, extend_impl=None, calibration_impl=None):
     src_dir = Path(__file__).resolve().parents[1] / "src"
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
@@ -26,6 +26,9 @@ def _load_wrapper_module(move_impl, retract_impl, calibration_impl=None):
     fake_hardware.init_serial = lambda: None
     fake_hardware.get_sensor_value = lambda *_: 0
 
+    if extend_impl is None:
+        extend_impl = lambda *_args, **_kwargs: True
+
     fake_motor_control = types.ModuleType("motor_control")
     fake_motor_control.move_to_distance = move_impl
     fake_motor_control.move_to_angle = (
@@ -38,6 +41,11 @@ def _load_wrapper_module(move_impl, retract_impl, calibration_impl=None):
             tolerance=tolerance,
             timeout=timeout,
         )
+    )
+    fake_motor_control.extend_fully = extend_impl
+    fake_motor_control.extend_tilt = (
+        lambda sensors, serial_port, timeout=30:
+        extend_impl(sensors, "adxl345", serial_port, timeout=timeout)
     )
     fake_motor_control.retract_fully = retract_impl
     fake_motor_control.retract_tilt = (
@@ -75,15 +83,16 @@ def _wait_for(predicate, timeout=2.0):
 def test_mqtt_motor_command_runs_in_background_and_can_be_stopped():
     started = threading.Event()
 
-    def move_impl(_sensors, _sensor_name, _target_mm, ser, tolerance=2, timeout=30):
+    def extend_impl(_sensors, _sensor_name, ser, timeout=30):
         started.set()
         while True:
             ser.write(b"x")
             time.sleep(0.01)
 
     wrapper_module, motor_control = _load_wrapper_module(
-        move_impl=move_impl,
+        move_impl=lambda *_args, **_kwargs: True,
         retract_impl=lambda *_args, **_kwargs: True,
+        extend_impl=extend_impl,
     )
 
     controller = wrapper_module.DeskControllerWrapper(log_file=None)
@@ -102,18 +111,19 @@ def test_mqtt_motor_command_runs_in_background_and_can_be_stopped():
 
 def test_only_one_motor_worker_is_started_while_active_move_exists():
     started = threading.Event()
-    move_calls = {"count": 0}
+    extend_calls = {"count": 0}
 
-    def move_impl(_sensors, _sensor_name, _target_mm, ser, tolerance=2, timeout=30):
-        move_calls["count"] += 1
+    def extend_impl(_sensors, _sensor_name, ser, timeout=30):
+        extend_calls["count"] += 1
         started.set()
         time.sleep(0.3)
         ser.write(b"x")
         return True
 
     wrapper_module, _ = _load_wrapper_module(
-        move_impl=move_impl,
+        move_impl=lambda *_args, **_kwargs: True,
         retract_impl=lambda *_args, **_kwargs: True,
+        extend_impl=extend_impl,
     )
 
     controller = wrapper_module.DeskControllerWrapper(log_file=None)
@@ -126,7 +136,7 @@ def test_only_one_motor_worker_is_started_while_active_move_exists():
     controller._mqtt_on_message(None, None, _Message(b"m2 -> up"))
     time.sleep(0.1)
 
-    assert move_calls["count"] == 1
+    assert extend_calls["count"] == 1
 
 
 def test_mqtt_calibrate_runs_async_and_blocks_motor_movement():
@@ -181,6 +191,7 @@ def test_mqtt_calibrate_runs_async_and_blocks_motor_movement():
 def test_direct_motor_methods_reject_while_calibrating():
     move_calls = {"count": 0}
     retract_calls = {"count": 0}
+    extend_calls = {"count": 0}
 
     def move_impl(_sensors, _sensor_name, _target_mm, _ser, tolerance=2, timeout=30):
         move_calls["count"] += 1
@@ -190,9 +201,14 @@ def test_direct_motor_methods_reject_while_calibrating():
         retract_calls["count"] += 1
         return True
 
+    def extend_impl(_sensors, _sensor_name, _ser, timeout=30):
+        extend_calls["count"] += 1
+        return True
+
     wrapper_module, _ = _load_wrapper_module(
         move_impl=move_impl,
         retract_impl=retract_impl,
+        extend_impl=extend_impl,
     )
 
     controller = wrapper_module.DeskControllerWrapper(log_file=None)
@@ -202,8 +218,10 @@ def test_direct_motor_methods_reject_while_calibrating():
 
     assert controller.move_motor_to_position(1, 20.0) is False
     assert controller.retract_motor_fully(1) is False
+    assert controller.extend_motor_to_max(1) is False
     assert move_calls["count"] == 0
     assert retract_calls["count"] == 0
+    assert extend_calls["count"] == 0
 
 
 def test_preset_load_motors_move_in_correct_order():
@@ -355,3 +373,59 @@ def test_preset_load_emergency_stop_interrupts_sequence():
     motor_control.emergency_stop.assert_called()
     # Only the first motor (M2) should have started; M3 and M1 must not have run
     assert move_count["n"] == 1
+
+
+def test_mqtt_up_calls_extend_not_move_to_position():
+    """'m{id} -> up' must dispatch to extend_motor_to_max, not move_motor_to_position."""
+    extend_called = threading.Event()
+    move_called = {"flag": False}
+
+    def extend_impl(_sensors, _sensor_name, _ser, timeout=30):
+        extend_called.set()
+        return True
+
+    def move_impl(_sensors, _sensor_name, _target_mm, _ser, tolerance=2, timeout=30):
+        move_called["flag"] = True
+        return True
+
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=move_impl,
+        retract_impl=lambda *_args, **_kwargs: True,
+        extend_impl=extend_impl,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+
+    controller._mqtt_on_message(None, None, _Message(b"m2 -> up"))
+    assert _wait_for(lambda: extend_called.is_set()), "extend was not called for 'up'"
+    assert not move_called["flag"], "move_to_position must NOT be called for 'up'"
+
+
+def test_mqtt_down_calls_retract_not_extend():
+    """'m{id} -> down' must dispatch to retract_motor_fully, not extend_motor_to_max."""
+    retract_called = threading.Event()
+    extend_called = {"flag": False}
+
+    def retract_impl(_sensors, _sensor_name, _ser, timeout=30):
+        retract_called.set()
+        return True
+
+    def extend_impl(_sensors, _sensor_name, _ser, timeout=30):
+        extend_called["flag"] = True
+        return True
+
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=lambda *_args, **_kwargs: True,
+        retract_impl=retract_impl,
+        extend_impl=extend_impl,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+
+    controller._mqtt_on_message(None, None, _Message(b"m2 -> down"))
+    assert _wait_for(lambda: retract_called.is_set()), "retract was not called for 'down'"
+    assert not extend_called["flag"], "extend must NOT be called for 'down'"
