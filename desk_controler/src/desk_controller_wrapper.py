@@ -207,7 +207,7 @@ class DeskControllerWrapper:
             Log file path
         auto_calibrate_on_init : bool, optional
             When True, automatically run calibration after hardware is
-            initialised (only if no calibration data already exists).
+            initialized (only if no calibration data already exists).
         """
         # Logger
         self.logger = DeskLogger(log_file)

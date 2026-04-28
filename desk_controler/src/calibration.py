@@ -127,7 +127,7 @@ def calibrate_automatic(sensors, retract_fn=None, max_retries=3):
 
 	# Attempt calibration with exponential back-off retry
 	for attempt in range(max_retries):
-		delay = 2 ** attempt  # 1 s, 2 s, 4 s
+		delay = 2 ** attempt  # delay before next retry: 1 s, 2 s, 4 s, …
 		try:
 			_log.info("Calibration attempt %d/%d...", attempt + 1, max_retries)
 			calibration_data = calibrate_vl53_sensors(sensors)
