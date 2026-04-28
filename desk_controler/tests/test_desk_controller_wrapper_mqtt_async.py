@@ -596,3 +596,92 @@ def test_auto_calibrate_on_init_triggers_auto_calibrate():
     result = controller.auto_calibrate()
     assert result is True
     assert auto_calibrate_called["flag"]
+
+
+# ---------------------------------------------------------------------------
+# _wait_for_motor_ready tests
+# ---------------------------------------------------------------------------
+
+def test_wait_for_motor_ready_returns_true_when_lock_free():
+    """_wait_for_motor_ready() returns True immediately when no motor is running."""
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=lambda *_args, **_kwargs: True,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    # Lock is not held; should return True quickly (plus 100 ms debounce)
+    result = controller._wait_for_motor_ready(timeout=2)
+    assert result is True
+
+
+def test_wait_for_motor_ready_blocks_until_lock_released():
+    """_wait_for_motor_ready() waits until motor_command_lock is free."""
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=lambda *_args, **_kwargs: True,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+
+    # Manually acquire the lock to simulate a running motor
+    assert controller.motor_command_lock.acquire(blocking=False)
+
+    # Release the lock from a background thread after a short delay
+    def _release():
+        time.sleep(0.15)
+        controller.motor_command_lock.release()
+
+    t = threading.Thread(target=_release, daemon=True)
+    t.start()
+
+    result = controller._wait_for_motor_ready(timeout=2)
+    assert result is True
+
+
+def test_wait_for_motor_ready_returns_false_on_timeout():
+    """_wait_for_motor_ready() returns False when the lock is never released."""
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=lambda *_args, **_kwargs: True,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+
+    # Hold the lock permanently – simulate a stuck motor
+    assert controller.motor_command_lock.acquire(blocking=False)
+    try:
+        result = controller._wait_for_motor_ready(timeout=0.2)
+        assert result is False
+    finally:
+        controller.motor_command_lock.release()
+
+
+def test_wait_for_motor_ready_does_not_deadlock_inside_worker():
+    """_wait_for_motor_ready() returns True quickly when called from a motor worker."""
+    reached = threading.Event()
+    wait_result: dict = {}
+    _controller: dict = {}
+
+    def slow_move_impl(_sensors, _sensor_name, _target, _ser, tolerance=2, timeout=30):
+        # Simulate the preset calling _wait_for_motor_ready from inside the worker
+        wait_result["val"] = _controller["ctrl"]._wait_for_motor_ready(timeout=2)
+        reached.set()
+        return True
+
+    wrapper_module, _ = _load_wrapper_module(
+        move_impl=slow_move_impl,
+        retract_impl=lambda *_args, **_kwargs: True,
+    )
+
+    controller = wrapper_module.DeskControllerWrapper(log_file=None)
+    controller.is_initialized = True
+    controller.serial_port = Mock()
+    controller.presets[1] = {1: 90.0, 2: 200.0, 3: 300.0}
+    _controller["ctrl"] = controller
+
+    # Dispatch via MQTT so load_and_execute_preset runs inside a motor worker
+    controller._mqtt_on_message(None, None, _Message(b"preset 1"))
+    assert _wait_for(lambda: reached.is_set(), timeout=3)
+    # Must return True (debounce only, no deadlock)
+    assert wait_result.get("val") is True
