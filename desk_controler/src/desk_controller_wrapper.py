@@ -261,11 +261,17 @@ class DeskControllerWrapper:
         # motor_stop_event – threading.Event that _InterruptibleSerialProxy
         #                  polls on every write; set by emergency_stop_all()
         #                  to interrupt any in-progress movement immediately.
+        # _motor_worker_context – threading.local() flag set to True on the
+        #                  worker thread inside _run_motor_worker so that
+        #                  _wait_for_motor_ready() can detect it is already
+        #                  running inside a motor worker (lock held by us) and
+        #                  avoid a self-deadlock when polling the lock.
         self.position_lock = threading.Lock()
         self._mqtt_state_lock = threading.Lock()   # guards mqtt_connected only
         self.mqtt_lock = threading.Lock()           # serialises publish() calls only
         self.motor_command_lock = threading.Lock()
         self.motor_stop_event = threading.Event()
+        self._motor_worker_context = threading.local()
 
         # Command dispatch queue: _mqtt_on_message enqueues payloads here so the
         # MQTT network-loop thread is never blocked by command processing.
@@ -441,6 +447,7 @@ class DeskControllerWrapper:
         even if the task raises an exception, preventing the controller from
         getting stuck in a "busy" state.
         """
+        self._motor_worker_context.active = True
         try:
             self.logger.debug(f"Motor worker '{task_name}' starting on thread {threading.current_thread().name}")
             task_fn(*args)
@@ -448,6 +455,7 @@ class DeskControllerWrapper:
         except Exception as e:
             self.logger.error(f"Motor worker '{task_name}' failed: {e}")
         finally:
+            self._motor_worker_context.active = False
             self.motor_command_lock.release()
             self.logger.debug(f"Motor command lock released by worker '{task_name}'")
     
@@ -460,6 +468,50 @@ class DeskControllerWrapper:
         if publish_status:
             self.publish_status("calibrating")
         return True
+
+    def _wait_for_motor_ready(self, timeout: float = 60) -> bool:
+        """Block until motor_command_lock is released, then add a 100 ms debounce.
+
+        Polls the lock state every 50 ms.  Once the lock is observed as free a
+        100 ms debounce pause is applied to allow the hardware to fully settle
+        before the next movement begins.
+
+        When called from within a motor-worker thread (i.e. the lock is already
+        held by the current thread via _start_motor_worker), the lock-polling
+        step is skipped to avoid a self-deadlock; only the 100 ms debounce is
+        applied.  This keeps the behaviour consistent whether the preset is
+        executed directly or dispatched through the MQTT worker machinery.
+
+        Parameters
+        ----------
+        timeout : float
+            Maximum seconds to wait for the lock to be released. Default 60.
+
+        Returns
+        -------
+        bool
+            True when the motor is ready (lock free + debounce), False on
+            timeout.
+        """
+        # Already inside a motor-worker thread – the lock is held by *this*
+        # thread, so polling it would deadlock.  Just debounce and continue.
+        if getattr(self._motor_worker_context, 'active', False):
+            time.sleep(0.1)
+            return True
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            acquired = self.motor_command_lock.acquire(blocking=False)
+            if acquired:
+                self.motor_command_lock.release()
+                time.sleep(0.1)  # 100 ms debounce
+                return True
+            time.sleep(0.05)  # poll every 50 ms
+
+        self.logger.warning(
+            f"Timeout ({timeout:.0f}s) waiting for motor_command_lock to be released"
+        )
+        return False
 
     def _start_motor_worker(self, task_name: str, task_fn, *args) -> bool:
         """Start a worker thread for motor operations.
@@ -953,6 +1005,15 @@ class DeskControllerWrapper:
                 if self.motor_stop_event.is_set():
                     self.logger.warning(f"Preset {preset_id} interrupted by emergency stop")
                     self.system_state = SystemState.IDLE
+                    return False
+
+                # Wait for any in-progress motor operation to complete and allow
+                # the hardware to settle before commanding the next motor.
+                if not self._wait_for_motor_ready():
+                    self.logger.error(
+                        f"Timeout waiting for motor to be ready before moving motor {motor_id}"
+                    )
+                    self.system_state = SystemState.ERROR
                     return False
 
                 target_pos = preset[motor_id]
