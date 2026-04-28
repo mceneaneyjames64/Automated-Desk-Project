@@ -294,15 +294,26 @@ class DeskControllerWrapper:
             scan_i2c_channels(tca)
             
             # Initialize VL53L0X sensors
+            # Channel 0 → SENSOR_VL53_0 → Motor 2
+            # Channel 1 → SENSOR_VL53_1 → Motor 3
             self.sensors[config.SENSOR_VL53_0] = init_vl53l0x(
-                tca, config.VL53_CHANNEL_1, "VL53L0X #0"
+                tca, config.VL53_CHANNEL_0, "VL53L0X #0"
             )
             self.sensors[config.SENSOR_VL53_1] = init_vl53l0x(
-                tca, config.VL53_CHANNEL_2, "VL53L0X #1"
+                tca, config.VL53_CHANNEL_1, "VL53L0X #1"
             )
-            
+
             # Initialize ADXL345
+            # Channel 2 → SENSOR_ADXL → Motor 1
             self.sensors[config.SENSOR_ADXL] = init_adxl345(tca)
+
+            # Log sensor-channel-motor mapping for easy verification at startup
+            self.logger.info(
+                "Sensor-channel-motor mapping: "
+                f"{config.SENSOR_VL53_0}→ch{config.VL53_CHANNEL_0}→Motor2, "
+                f"{config.SENSOR_VL53_1}→ch{config.VL53_CHANNEL_1}→Motor3, "
+                f"{config.SENSOR_ADXL}→ch{config.ADXL345_CHANNEL}→Motor1"
+            )
             
             # Initialize serial port
             self.serial_port = init_serial()

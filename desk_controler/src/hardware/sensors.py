@@ -58,10 +58,10 @@ def init_vl53l0x(tca, channel, name):
 def init_adxl345(tca):
     """Initialize ADXL345 accelerometer."""
     print("Initializing ADXL345 accelerometer...")
-    require_address(tca, config.ADXL_CHANNEL, hex(config.ADXL_ADDRESS), "ADXL345")
+    require_address(tca, config.ADXL345_CHANNEL, hex(config.ADXL_ADDRESS), "ADXL345")
 
     def _init():
-        sensor = adafruit_adxl34x.ADXL345(tca[config.ADXL_CHANNEL])
+        sensor = adafruit_adxl34x.ADXL345(tca[config.ADXL345_CHANNEL])
         read_with_timeout(lambda: sensor.acceleration, "ADXL345 acceleration validation")
         return sensor
 
