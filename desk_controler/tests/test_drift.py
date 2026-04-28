@@ -35,7 +35,7 @@ def setup_hardware():
     i2c = init_i2c()
     tca = init_mux(i2c)
     sensors = {
-        "vl53l0x_0": init_vl53l0x(tca, config.VL53_CHANNEL_1, "VL53L0X #1"),
+        "vl53l0x_0": init_vl53l0x(tca, config.VL53_CHANNEL_0, "VL53L0X #1"),
         "mux": tca,
     }
     ser = init_serial()

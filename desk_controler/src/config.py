@@ -13,10 +13,14 @@ OFFSET = {'vl53l0x_0': -62.967, 'vl53l0x_1': -53.667}
 
 # =============================================================================
 # TCA9548A Multiplexer Channel Assignments
+#   Channel numbers match the physical wiring documented in the README:
+#     Channel 0 → VL53L0X Distance Sensor #0  (drives Motor 2)
+#     Channel 1 → VL53L0X Distance Sensor #1  (drives Motor 3)
+#     Channel 2 → ADXL345 Accelerometer       (drives Motor 1)
 # =============================================================================
-VL53_CHANNEL_1 = 0
-VL53_CHANNEL_2 = 1
-ADXL_CHANNEL   = 2
+VL53_CHANNEL_0  = 0  # VL53L0X Distance Sensor #0 on Multiplexer Channel 0
+VL53_CHANNEL_1  = 1  # VL53L0X Distance Sensor #1 on Multiplexer Channel 1
+ADXL345_CHANNEL = 2  # ADXL345 Accelerometer on Multiplexer Channel 2
 
 # =============================================================================
 # Sensor I2C Addresses
