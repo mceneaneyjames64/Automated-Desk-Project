@@ -230,8 +230,8 @@ import config
 i2c = init_i2c()
 tca = init_mux(i2c)
 sensors = {
-    'vl53l0x_0': init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #1'),
-    'vl53l0x_1': init_vl53l0x(tca, config.VL53_CHANNEL_2, 'VL53L0X #2')
+    'vl53l0x_0': init_vl53l0x(tca, config.VL53_CHANNEL_0, 'VL53L0X #1'),
+    'vl53l0x_1': init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #2')
 }
 
 # Calibrate
@@ -277,8 +277,8 @@ import config
 i2c = init_i2c()
 tca = init_mux(i2c)
 sensors = {
-    'vl53l0x_0': init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #1'),
-    'vl53l0x_1': init_vl53l0x(tca, config.VL53_CHANNEL_2, 'VL53L0X #2'),
+    'vl53l0x_0': init_vl53l0x(tca, config.VL53_CHANNEL_0, 'VL53L0X #1'),
+    'vl53l0x_1': init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #2'),
     'adxl345': init_adxl345(tca)
 }
 
@@ -334,7 +334,7 @@ import config
 
 i2c = init_i2c()
 tca = init_mux(i2c)
-sensor = init_vl53l0x(tca, config.VL53_CHANNEL_1, "VL53L0X #1")
+sensor = init_vl53l0x(tca, config.VL53_CHANNEL_0, "VL53L0X #1")
 
 distance = get_sensor_value({'vl53l0x_0': sensor}, 'vl53l0x_0')
 print(f"Current position: {distance} mm")
@@ -349,7 +349,7 @@ import config
 # Initialize
 i2c = init_i2c()
 tca = init_mux(i2c)
-sensor = init_vl53l0x(tca, config.VL53_CHANNEL_1, "VL53L0X #1")
+sensor = init_vl53l0x(tca, config.VL53_CHANNEL_0, "VL53L0X #1")
 ser = init_serial()
 
 # Move to 150mm

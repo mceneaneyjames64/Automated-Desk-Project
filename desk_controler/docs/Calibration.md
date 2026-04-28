@@ -87,8 +87,8 @@ import config
 i2c = init_i2c()
 tca = init_mux(i2c)
 sensors = {
-    config.SENSOR_VL53_0: init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #1'),
-    config.SENSOR_VL53_1: init_vl53l0x(tca, config.VL53_CHANNEL_2, 'VL53L0X #2'),
+    config.SENSOR_VL53_0: init_vl53l0x(tca, config.VL53_CHANNEL_0, 'VL53L0X #1'),
+    config.SENSOR_VL53_1: init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #2'),
 }
 
 # Run calibration
@@ -190,8 +190,8 @@ import config
 i2c = init_i2c()
 tca = init_mux(i2c)
 sensors = {
-    config.SENSOR_VL53_0: init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #1'),
-    config.SENSOR_VL53_1: init_vl53l0x(tca, config.VL53_CHANNEL_2, 'VL53L0X #2'),
+    config.SENSOR_VL53_0: init_vl53l0x(tca, config.VL53_CHANNEL_0, 'VL53L0X #1'),
+    config.SENSOR_VL53_1: init_vl53l0x(tca, config.VL53_CHANNEL_1, 'VL53L0X #2'),
 }
 
 calibration = load_calibration()
