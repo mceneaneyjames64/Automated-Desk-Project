@@ -1,12 +1,13 @@
 """
 Motor control functions for actuator positioning.
 
-Distance actuators (Motors 1 & 2)
+Distance actuators (Motors 2 & 3)
 ----------------------------------
   move_to_distance()  — closed-loop control using VL53L0X sensors (mm).
+  extend_fully()      — drives an actuator to config.MAX_POSITION.
   retract_fully()     — drives an actuator to config.MIN_POSITION.
 
-Angle actuator (Motor 3)
+Angle actuator (Motor 1)
 ------------------------
   move_to_angle()     — closed-loop control using the ADXL345 accelerometer
                         (degrees).  Reads the Z-axis tilt angle as returned
@@ -16,6 +17,7 @@ Angle actuator (Motor 3)
                             90°  → sensor perpendicular  (Z ≈  0)
                             180° → sensor right-side up  (Z ≈ +g)
 
+  extend_tilt()       — drives the angle actuator to config.MAX_ANGLE_DEG.
   retract_tilt()      — drives the angle actuator to config.MIN_ANGLE_DEG.
 
 Emergency stop
@@ -136,6 +138,53 @@ def move_to_distance(sensors: dict, sensor_name: str, target_mm: float,
         # Negative error → not far enough → extend
         ser.write(cmd_retract if error > 0 else cmd_extend)
         time.sleep(0.05)
+
+
+def extend_fully(sensors: dict, sensor_name: str,
+                 ser, timeout: float = 30) -> bool:
+    """
+    Drive an actuator to config.MAX_POSITION using raw sensor readings.
+
+    Sends continuous EXTEND commands until the raw sensor reading reaches
+    MAX_POSITION.  Using raw readings (not offset-corrected) matches the same
+    convention as retract_fully() and avoids closed-loop direction inversions
+    caused by calibration offset errors.
+
+    Parameters
+    ----------
+    sensors     : Dictionary of initialised sensor objects.
+    sensor_name : One of config.SENSOR_VL53_0 / SENSOR_VL53_1.
+    ser         : Open serial.Serial object.
+    timeout     : Maximum movement time in seconds (default 30 s).
+
+    Returns
+    -------
+    True if fully extended, False on timeout.
+    """
+    if ser is None:
+        raise ValueError("A serial port object is required for motor control.")
+
+    cmd_extend = _get_motor_commands(sensor_name)["extend"]
+
+    print(f"[motor] Extending '{sensor_name}' to maximum position "
+          f"({config.MAX_POSITION} mm) …")
+
+    start_time = time.monotonic()
+
+    while time.monotonic() - start_time < timeout:
+        current_mm = get_sensor_value(sensors, sensor_name)
+
+        if current_mm >= config.MAX_POSITION:
+            ser.write(config.CMD_ALL_OFF)
+            print(f"[motor] '{sensor_name}' extended to {current_mm:.1f} mm.")
+            return True
+
+        ser.write(cmd_extend)
+        time.sleep(0.1)
+
+    ser.write(config.CMD_ALL_OFF)
+    print(f"[motor] Timeout while extending '{sensor_name}'.")
+    return False
 
 
 def retract_fully(sensors: dict, sensor_name: str,
@@ -262,7 +311,7 @@ def move_to_angle(sensors: dict, target_deg: float,
 
 def retract_tilt(sensors: dict, ser, timeout: float = 30) -> bool:
     """
-    Drive the tilt actuator (Motor 3) to config.MIN_ANGLE_DEG.
+    Drive the tilt actuator (Motor 1) to config.MIN_ANGLE_DEG.
 
     Use this to return the tilt axis to its fully retracted (minimum angle)
     position, for example during shutdown or before re-calibration.
@@ -300,6 +349,49 @@ def retract_tilt(sensors: dict, ser, timeout: float = 30) -> bool:
 
     ser.write(config.CMD_ALL_OFF)
     print(f"[motor] Timeout while retracting tilt actuator.")
+    return False
+
+
+def extend_tilt(sensors: dict, ser, timeout: float = 30) -> bool:
+    """
+    Drive the tilt actuator (Motor 1) to config.MAX_ANGLE_DEG.
+
+    Sends continuous EXTEND commands until the sensor reading reaches
+    MAX_ANGLE_DEG.  This is the "up" counterpart to retract_tilt().
+
+    Parameters
+    ----------
+    sensors : Dictionary of initialised sensor objects.
+    ser     : Open serial.Serial object.
+    timeout : Maximum movement time in seconds (default 30 s).
+
+    Returns
+    -------
+    True if the maximum angle was reached, False on timeout.
+    """
+    if ser is None:
+        raise ValueError("A serial port object is required for motor control.")
+
+    cmd_extend = _get_motor_commands(config.SENSOR_ADXL)["extend"]
+
+    print(f"[motor] Extending tilt actuator to maximum angle "
+          f"({config.MAX_ANGLE_DEG}°) …")
+
+    start_time = time.monotonic()
+
+    while time.monotonic() - start_time < timeout:
+        current_deg = get_sensor_value(sensors, config.SENSOR_ADXL)
+
+        if current_deg >= config.MAX_ANGLE_DEG:
+            ser.write(config.CMD_ALL_OFF)
+            print(f"[motor] Tilt extended to {current_deg:.1f}°.")
+            return True
+
+        ser.write(cmd_extend)
+        time.sleep(0.1)
+
+    ser.write(config.CMD_ALL_OFF)
+    print(f"[motor] Timeout while extending tilt actuator.")
     return False
 
 

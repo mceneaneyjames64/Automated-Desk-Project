@@ -37,6 +37,8 @@ from hardware import (
 from motor_control import (
     move_to_distance,
     move_to_angle,
+    extend_fully,
+    extend_tilt,
     retract_fully,
     retract_tilt,
     emergency_stop,
@@ -658,6 +660,91 @@ class DeskControllerWrapper:
             self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
             return False
     
+    def extend_motor_to_max(self, motor_id: int, timeout: float = 30) -> bool:
+        """
+        Extend a motor to maximum position using direct EXTEND commands.
+
+        Sends continuous EXTEND commands until the sensor reading reaches
+        MAX_POSITION (or MAX_ANGLE_DEG for the tilt actuator).  Using raw
+        direction commands instead of closed-loop position targeting ensures
+        that "up" always moves the actuator upward regardless of calibration
+        offset state.
+
+        Parameters
+        ----------
+        motor_id : int
+            Motor ID (1-3)
+        timeout : float
+            Maximum movement time in seconds
+
+        Returns
+        -------
+        bool
+            True if successful, False otherwise
+        """
+        try:
+            if not self.is_initialized:
+                self.logger.warning("Hardware not initialized")
+                return False
+
+            if self._reject_if_calibrating():
+                return False
+
+            if motor_id not in [1, 2, 3]:
+                self.logger.error(f"Invalid motor ID: {motor_id}")
+                return False
+
+            self.logger.info(f"Extending motor {motor_id} to maximum position")
+            self.motor_status[motor_id] = "moving"
+            self.system_state = SystemState.MOVING
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
+
+            serial_port = _InterruptibleSerialProxy(self.serial_port, self.motor_stop_event)
+            if motor_id == 1:
+                success = extend_tilt(self.sensors, serial_port, timeout=timeout)
+            else:
+                sensor_name = self._distance_sensor_for_motor(motor_id)
+                if not sensor_name:
+                    self.logger.error(f"No sensor mapped for motor {motor_id}")
+                    return False
+                success = extend_fully(self.sensors, sensor_name, serial_port, timeout=timeout)
+
+            if success:
+                with self.position_lock:
+                    self.motor_positions[motor_id] = self._motor_max_target(motor_id)
+                self.motor_status[motor_id] = "idle"
+                self.logger.info(f"✓ Motor {motor_id} fully extended")
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
+
+                # Publish feedback
+                self.publish_position_feedback(motor_id)
+
+                if all(status == "idle" for status in self.motor_status.values()):
+                    self.system_state = SystemState.IDLE
+
+                return True
+            else:
+                self.motor_status[motor_id] = "error"
+                self.system_state = SystemState.ERROR
+                self.logger.error(f"✗ Motor {motor_id} failed to extend")
+                self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
+                return False
+
+        except InterruptedError:
+            self.motor_status[motor_id] = "stopped"
+            if all(status != "moving" for status in self.motor_status.values()):
+                self.system_state = SystemState.IDLE
+            self.logger.warning(f"Motor {motor_id} extension interrupted")
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
+            return False
+
+        except Exception as e:
+            self.logger.error(f"Error extending motor {motor_id}: {e}")
+            self.motor_status[motor_id] = "error"
+            self.system_state = SystemState.ERROR
+            self.logger.debug(f"M{motor_id} status: {self.motor_status[motor_id]}")
+            return False
+
     def emergency_stop_all(self) -> bool:
         """
         Emergency stop all motors.
@@ -1053,12 +1140,10 @@ class DeskControllerWrapper:
                     motor_id = int(motor_part[1:])
 
                     if direction_part.lower() == "up":
-                        target = self._motor_max_target(motor_id)
                         self._start_motor_movement_worker(
                             f"m{motor_id}-up",
-                            self.move_motor_to_position,
-                            motor_id,
-                            target
+                            self.extend_motor_to_max,
+                            motor_id
                         )
                     elif direction_part.lower() == "down":
                         self._start_motor_movement_worker(
