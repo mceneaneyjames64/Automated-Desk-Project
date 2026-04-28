@@ -43,7 +43,12 @@ from motor_control import (
     retract_tilt,
     emergency_stop,
 )
-from calibration import calibrate_vl53_sensors, load_calibration, get_calibrated_reading
+from calibration import (
+    calibrate_vl53_sensors,
+    calibrate_automatic,
+    load_calibration,
+    get_calibrated_reading,
+)
 
 try:
     import paho.mqtt.client as mqtt
@@ -175,7 +180,8 @@ class DeskControllerWrapper:
                  mqtt_status_topic: str = "home/desk/status",
                  mqtt_feedback_topic: str = "home/desk/feedback",
                  presets_file: str = "desk_presets.json",
-                 log_file: Optional[str] = "desk_controller.log"):
+                 log_file: Optional[str] = "desk_controller.log",
+                 auto_calibrate_on_init: bool = False):
         """
         Initialize desk controller wrapper.
         
@@ -199,10 +205,16 @@ class DeskControllerWrapper:
             JSON file path for presets
         log_file : str, optional
             Log file path
+        auto_calibrate_on_init : bool, optional
+            When True, automatically run calibration after hardware is
+            initialised (only if no calibration data already exists).
         """
         # Logger
         self.logger = DeskLogger(log_file)
         
+        # Auto-calibration flag
+        self.auto_calibrate_on_init = auto_calibrate_on_init
+
         # Hardware state
         self.sensors = {}
         self.serial_port = None
@@ -327,6 +339,10 @@ class DeskControllerWrapper:
             
             self.is_initialized = True
             self.logger.info("✓ Hardware initialized successfully")
+
+            if self.auto_calibrate_on_init:
+                self.auto_calibrate()
+
             return True
         
         except Exception as e:
@@ -972,7 +988,75 @@ class DeskControllerWrapper:
     ################################################################################
     #                           CALIBRATION
     ################################################################################
-    
+
+    def auto_calibrate(self) -> bool:
+        """
+        Run automatic calibration without user interaction.
+
+        Checks whether calibration data already exists; if so the routine is
+        skipped.  Otherwise all motors are retracted to the home position,
+        then :func:`calibration.calibrate_automatic` is called with
+        exponential back-off retry logic.  MQTT status updates are published
+        at each major stage.
+
+        Returns
+        -------
+        bool
+            True if calibration succeeded or was already present, False if
+            all retry attempts were exhausted or a fatal error occurred.
+        """
+        if not self.is_initialized:
+            self.logger.warning("Hardware not initialized; cannot run auto-calibration.")
+            return False
+
+        # Skip when calibration data already exists
+        if load_calibration():
+            self.logger.info("Calibration data already exists — skipping auto-calibration.")
+            return True
+
+        self.logger.info("Auto-calibration starting...")
+        self.publish_status("Auto-calibration starting")
+
+        # Retract all motors before measuring (state must be IDLE here)
+        def _retract_all() -> bool:
+            self.logger.info("Retracting all motors to home position...")
+            for motor_id in [2, 3, 1]:
+                if not self.retract_motor_fully(motor_id):
+                    self.logger.error(
+                        f"Failed to retract motor {motor_id} before calibration."
+                    )
+                    return False
+            return True
+
+        self.system_state = SystemState.CALIBRATING
+
+        calibration_data = calibrate_automatic(
+            self.sensors,
+            retract_fn=_retract_all,
+            max_retries=3,
+        )
+
+        if calibration_data is not None:
+            self.calibration_data = calibration_data
+            self.logger.info("✓ Auto-calibration complete.")
+            self.system_state = SystemState.IDLE
+            self.publish_status("Auto-calibration complete")
+            return True
+
+        # All retries failed — attempt to return motors to a safe position
+        self.system_state = SystemState.ERROR
+        self.logger.error("✗ Auto-calibration failed.")
+        self.publish_status("Auto-calibration failed")
+
+        # Best-effort safe retract
+        for motor_id in [2, 3, 1]:
+            try:
+                self.retract_motor_fully(motor_id)
+            except Exception:
+                pass
+
+        return False
+
     def run_calibration(self) -> bool:
         """
         Run sensor calibration routine.

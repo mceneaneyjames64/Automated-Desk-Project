@@ -14,6 +14,7 @@ This replaces the old main.py that used run_test() and provides:
 import sys
 import time
 import signal
+import argparse
 from desk_controller_wrapper import DeskControllerWrapper
 
 
@@ -174,11 +175,6 @@ def handle_calibration(controller: DeskControllerWrapper):
         print("\nCalibration will measure sensor accuracy and apply offsets.")
         print("Ensure all motors are FULLY RETRACTED before continuing.\n")
         
-        response = input("Continue with calibration? (yes/no): ").strip().lower()
-        if response not in ["yes", "y"]:
-            print("Calibration cancelled")
-            return
-        
         if controller.run_calibration():
             print("\n✓ Calibration completed successfully")
         else:
@@ -269,6 +265,15 @@ def main():
     """Main application entry point."""
     global controller
     
+    parser = argparse.ArgumentParser(description="Automated Desk System")
+    parser.add_argument(
+        "--auto-calibrate",
+        action="store_true",
+        default=False,
+        help="Automatically run calibration on startup if no calibration data exists.",
+    )
+    args = parser.parse_args()
+
     print("\n" + "="*70)
     print("  AUTOMATED DESK SYSTEM - MAIN APPLICATION")
     print("="*70 + "\n")
@@ -286,7 +291,8 @@ def main():
         mqtt_status_topic="home/desk/status",
         mqtt_feedback_topic="home/desk/feedback",
         presets_file="desk_presets.json",
-        log_file="desk_controller.log"
+        log_file="desk_controller.log",
+        auto_calibrate_on_init=args.auto_calibrate,
     )
     
     try:

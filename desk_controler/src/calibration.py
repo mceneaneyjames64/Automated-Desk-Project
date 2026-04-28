@@ -6,10 +6,13 @@ register at runtime. Instead, this module measures the sensor error against a
 known reference distance and saves a software offset that is applied to every
 reading via get_calibrated_reading().
 """
+import logging
 import time
 import config
 import pprint
 from hardware import get_sensor_value
+
+_log = logging.getLogger(__name__)
 
 CALIBRATION_SAMPLES = 30
 SAMPLE_DELAY = 0.1
@@ -40,7 +43,6 @@ def calibrate_vl53_sensors(sensors):
 	print("VL53L0X SENSOR CALIBRATION")
 	print("=" * 50)
 	print("\nEnsure actuators are fully retracted before continuing.")
-	input("Press ENTER when ready to calibrate...\n")
 
 	calibration_data = {}
 
@@ -84,6 +86,67 @@ def calibrate_vl53_sensors(sensors):
 	print(f"  Data saved to config.OFFSET\n")
 
 	return calibration_data
+
+
+def calibrate_automatic(sensors, retract_fn=None, max_retries=3):
+	"""
+	Run the full calibration flow automatically without user interaction.
+
+	Parameters
+	----------
+	sensors : dict
+		Initialized sensor objects (as returned by hardware init helpers).
+	retract_fn : callable, optional
+		Zero-argument callable that retracts all motors to the home position
+		before calibration begins.  Should return True on success, False on
+		failure.  When *None* no retraction is attempted.
+	max_retries : int
+		Maximum number of calibration attempts before giving up (default: 3).
+		Retries use exponential back-off: 1 s, 2 s, 4 s, …
+
+	Returns
+	-------
+	dict or None
+		Calibration data dictionary (same shape as ``calibrate_vl53_sensors``)
+		on success, or *None* if all attempts failed.
+	"""
+	# Skip if calibration data already exists
+	if load_calibration():
+		_log.info("Calibration data already exists — skipping automatic calibration.")
+		return load_calibration()
+
+	_log.info("Starting automatic calibration routine...")
+
+	# Retract motors to known home position before measuring
+	if retract_fn is not None:
+		_log.info("Retracting motors to home position...")
+		if not retract_fn():
+			_log.error("Motor retraction failed; cannot proceed with calibration.")
+			return None
+
+	# Attempt calibration with exponential back-off retry
+	for attempt in range(max_retries):
+		delay = 2 ** attempt  # 1 s, 2 s, 4 s
+		try:
+			_log.info("Calibration attempt %d/%d...", attempt + 1, max_retries)
+			calibration_data = calibrate_vl53_sensors(sensors)
+			_log.info("Automatic calibration completed successfully.")
+			return calibration_data
+		except Exception as exc:
+			_log.error("Calibration attempt %d failed: %s", attempt + 1, exc)
+			if attempt < max_retries - 1:
+				_log.info("Retrying in %ds...", delay)
+				time.sleep(delay)
+
+	# All retries exhausted — try to return to a safe (retracted) state
+	if retract_fn is not None:
+		try:
+			retract_fn()
+		except Exception:
+			pass
+
+	_log.error("Automatic calibration failed after %d attempt(s).", max_retries)
+	return None
 
 
 def save_calibration(calibration_data):
