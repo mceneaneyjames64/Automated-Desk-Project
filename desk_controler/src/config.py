@@ -106,7 +106,7 @@ MIN_POSITION = 0
 MAX_POSITION = 390
 
 # =============================================================================
-# Angle Limits (degrees) — ADXL345 actuator (Motor 3)
+# Angle Limits (degrees) — ADXL345 actuator (Motor 1)
 #
 #   The actuator has a 200 mm stroke.  Map that stroke onto an angle window
 #   that keeps the actuator safely within its mechanical limits.

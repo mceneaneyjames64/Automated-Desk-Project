@@ -236,13 +236,13 @@ def retract_fully(sensors: dict, sensor_name: str,
 
 
 # ---------------------------------------------------------------------------
-# Angle actuator (ADXL345 feedback, Motor 3)
+# Angle actuator (ADXL345 feedback, Motor 1)
 # ---------------------------------------------------------------------------
 
 def move_to_angle(sensors: dict, target_deg: float,
                   ser, tolerance: float = 1.0, timeout: float = 30) -> bool:
     """
-    Move the tilt actuator (Motor 3) to a target angle using the ADXL345.
+    Move the tilt actuator (Motor 1) to a target angle using the ADXL345.
 
     The ADXL345 measures tilt via the Z-axis gravity component.  The angle
     convention (set in sensors.get_sensor_value) is:
