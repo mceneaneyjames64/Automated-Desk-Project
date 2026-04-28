@@ -60,16 +60,22 @@ def _read_corrected(sensors: dict, sensor_name: str) -> float:
     """
     Return the offset-corrected distance for a VL53L0X sensor.
 
-    Applies config.OFFSET[sensor_name] to the raw reading.  If no offset
-    entry exists (calibration not yet run) the raw reading is returned and a
-    warning is printed.
+    Takes config.SENSOR_AVERAGE_SAMPLES consecutive readings and averages them
+    before applying config.OFFSET[sensor_name].  Averaging suppresses the
+    per-reading noise (typically ±2–5 mm on the VL53L0X) so that the
+    calibration offset — which was itself computed from a 30-sample average —
+    is applied to an equally stable value rather than a single noisy sample.
+
+    If no offset entry exists (calibration not yet run) the averaged raw
+    reading is returned and a warning is printed.
 
     The offset is a software correction produced by the VL53L0X calibration
     routine (calibrate_vl53_sensors).  It compensates for the physical gap
     between the sensor face and the actuator zero-point so that position
     commands work in real-world millimetres rather than raw sensor distances.
     """
-    raw = get_sensor_value(sensors, sensor_name)
+    n = config.SENSOR_AVERAGE_SAMPLES
+    raw = sum(get_sensor_value(sensors, sensor_name) for _ in range(n)) / n
     offset = getattr(config, "OFFSET", {}).get(sensor_name)
     if offset is None:
         print(f"[motor] Warning: no calibration offset for '{sensor_name}' — "
