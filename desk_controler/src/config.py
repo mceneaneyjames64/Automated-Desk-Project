@@ -49,6 +49,14 @@ DISTANCE_SENSORS = (SENSOR_VL53_0, SENSOR_VL53_1)
 VL53_TIMING_BUDGET = 33000    # microseconds
 VL53_RATE_LIMIT    = 0.25     # MCPS
 VL53_SIGMA_LIMIT   = 9        # millimetres
+# Number of consecutive VL53L0X readings to average inside the closed-loop
+# control and calibration helpers.  Averaging suppresses the per-reading noise
+# (typically ±2–5 mm) so that the calibration offset is applied to a stable
+# value rather than a single noisy sample.  Three samples add ~66 ms of extra
+# latency per control cycle (3 × 33 ms timing budget) which is acceptable for
+# desk positioning.  Increase to 5 for noisier environments; decrease to 2 to
+# favour responsiveness over noise immunity.
+SENSOR_AVERAGE_SAMPLES = 3
 
 # =============================================================================
 # Serial / UART Configuration
