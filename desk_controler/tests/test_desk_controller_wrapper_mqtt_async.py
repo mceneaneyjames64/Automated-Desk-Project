@@ -401,6 +401,11 @@ def test_mqtt_up_calls_extend_not_move_to_position():
     controller._mqtt_on_message(None, None, _Message(b"m2 -> up"))
     assert _wait_for(lambda: extend_called.is_set()), "extend was not called for 'up'"
     assert not move_called["flag"], "move_to_position must NOT be called for 'up'"
+    # Motor position should be updated to MAX after a successful extend
+    import importlib as _il
+    cfg = _il.import_module("config")
+    assert _wait_for(lambda: controller.motor_positions[2] == cfg.MAX_POSITION), \
+        "motor_positions[2] was not set to MAX_POSITION after 'up'"
 
 
 def test_mqtt_down_calls_retract_not_extend():
@@ -429,3 +434,8 @@ def test_mqtt_down_calls_retract_not_extend():
     controller._mqtt_on_message(None, None, _Message(b"m2 -> down"))
     assert _wait_for(lambda: retract_called.is_set()), "retract was not called for 'down'"
     assert not extend_called["flag"], "extend must NOT be called for 'down'"
+    # Motor position should be updated to MIN after a successful retract
+    import importlib as _il
+    cfg = _il.import_module("config")
+    assert _wait_for(lambda: controller.motor_positions[2] == cfg.MIN_POSITION), \
+        "motor_positions[2] was not set to MIN_POSITION after 'down'"
