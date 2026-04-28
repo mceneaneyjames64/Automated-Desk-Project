@@ -1017,22 +1017,26 @@ class DeskControllerWrapper:
         self.logger.info("Auto-calibration starting...")
         self.publish_status("Auto-calibration starting")
 
-        # Retract all motors before measuring (state must be IDLE here)
-        def _retract_all() -> bool:
-            self.logger.info("Retracting all motors to home position...")
-            for motor_id in [2, 3, 1]:
-                if not self.retract_motor_fully(motor_id):
-                    self.logger.error(
-                        f"Failed to retract motor {motor_id} before calibration."
-                    )
-                    return False
-            return True
+        # Retract all motors to a known home position before measuring.
+        # This must happen while system_state is still IDLE so that
+        # retract_motor_fully() is not rejected by the calibration interlock.
+        self.logger.info("Retracting all motors to home position...")
+        for motor_id in [2, 3, 1]:
+            if not self.retract_motor_fully(motor_id):
+                self.logger.error(
+                    f"Failed to retract motor {motor_id} before calibration."
+                )
+                self.publish_status("Auto-calibration failed: motor retraction error")
+                return False
 
+        # Retraction complete — motors are at home.  Switch to CALIBRATING and
+        # run the calibration routine.  No retract_fn needed here because the
+        # motors have already been retracted above.
         self.system_state = SystemState.CALIBRATING
 
         calibration_data = calibrate_automatic(
             self.sensors,
-            retract_fn=_retract_all,
+            retract_fn=None,
             max_retries=3,
         )
 
@@ -1043,18 +1047,19 @@ class DeskControllerWrapper:
             self.publish_status("Auto-calibration complete")
             return True
 
-        # All retries failed — attempt to return motors to a safe position
-        self.system_state = SystemState.ERROR
+        # All retries failed — attempt to return motors to a safe position.
+        # Reset state to IDLE first so retract_motor_fully is not blocked.
+        self.system_state = SystemState.IDLE
         self.logger.error("✗ Auto-calibration failed.")
         self.publish_status("Auto-calibration failed")
 
-        # Best-effort safe retract
         for motor_id in [2, 3, 1]:
             try:
                 self.retract_motor_fully(motor_id)
             except Exception:
                 pass
 
+        self.system_state = SystemState.ERROR
         return False
 
     def run_calibration(self) -> bool:

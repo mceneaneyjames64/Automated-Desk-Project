@@ -102,7 +102,8 @@ def calibrate_automatic(sensors, retract_fn=None, max_retries=3):
 		failure.  When *None* no retraction is attempted.
 	max_retries : int
 		Maximum number of calibration attempts before giving up (default: 3).
-		Retries use exponential back-off: 1 s, 2 s, 4 s, …
+		Retries use exponential back-off delays: 1 s before the 2nd attempt,
+		2 s before the 3rd, 4 s before the 4th, etc.
 
 	Returns
 	-------

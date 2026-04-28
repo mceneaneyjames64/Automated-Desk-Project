@@ -515,8 +515,9 @@ def test_auto_calibrate_retracts_motors_then_calibrates():
     calibration_ran = {"flag": False}
 
     def calibration_impl(sensors, retract_fn=None, max_retries=3):
-        if retract_fn is not None:
-            retract_fn()
+        # The wrapper retracts motors before calling calibrate_automatic, so
+        # retract_fn should be None here.
+        assert retract_fn is None, "wrapper should pass retract_fn=None (already retracted)"
         calibration_ran["flag"] = True
         return {"vl53l0x_0": {"offset_mm": -1.0}, "vl53l0x_1": {"offset_mm": -2.0}}
 
@@ -542,6 +543,10 @@ def test_auto_calibrate_retracts_motors_then_calibrates():
 
     assert result is True, "auto_calibrate should succeed when calibration returns data"
     assert calibration_ran["flag"], "calibrate_automatic must be called"
+    # All three motors must have been retracted in the correct order (2, 3, 1)
+    assert retract_calls == [2, 3, 1], (
+        f"Expected retract order [2, 3, 1], got {retract_calls}"
+    )
 
 
 def test_auto_calibrate_returns_false_when_not_initialized():
