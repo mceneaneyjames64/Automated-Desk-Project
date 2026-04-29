@@ -96,15 +96,14 @@ calibrate_vl53_sensors(sensors)
 "
 ```
 
-### Step 3 — Follow the On-Screen Prompts
+### Step 3 — Calibration Begins Immediately
 
 The calibration routine will:
 
 1. Print a reminder to retract the actuators
-2. Wait for you to press **ENTER**
-3. Take **30 samples** from each sensor (one every 0.1 s)
-4. Calculate and display the offset for each sensor
-5. Write the offsets to `config.py`
+2. Immediately begin taking **30 samples** from each sensor (one every 0.1 s)
+3. Calculate and display the offset for each sensor
+4. Write the offsets to `config.py`
 
 **Example output:**
 
@@ -114,7 +113,6 @@ VL53L0X SENSOR CALIBRATION
 ==================================================
 
 Ensure actuators are fully retracted before continuing.
-Press ENTER when ready to calibrate...
 
 Calibrating VL53L0X #1...
   Known distance: 0 mm
